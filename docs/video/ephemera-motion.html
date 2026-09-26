@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Ephemera — motion design</title>
+<style>
+  :root {
+    --bg: #07090c; --panel: #0d1117; --panel2: #121821; --line: #1e2733; --line2: #2b3746;
+    --fg: #e6edf3; --muted: #8b98a8; --dim: #5b6776;
+    --ok: #3fd07f; --warn: #f2b33d; --bad: #ff5c5c; --info: #4fb3ff; --accent: #76b900;
+    --sans: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+    --mono: "DejaVu Sans Mono", "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--sans); }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden;
+    background:
+      radial-gradient(1200px 700px at 50% 45%, rgba(118,185,0,0.06), transparent 70%),
+      var(--bg); }
+  .grid { position: absolute; inset: 0;
+    background-image: linear-gradient(to right, rgba(255,255,255,0.028) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255,255,255,0.028) 1px, transparent 1px);
+    background-size: 48px 48px; }
+  .layer { position: absolute; inset: 0; opacity: 0; }
+  .abs { position: absolute; }
+  .mono { font-family: var(--mono); }
+  .center { left: 0; right: 0; text-align: center; }
+  canvas { position: absolute; inset: 0; }
+
+  .h1 { font-size: 78px; font-weight: 700; letter-spacing: -1px; }
+  .h2 { font-size: 52px; font-weight: 700; }
+  .cap { font-size: 40px; font-weight: 600; color: var(--fg); }
+  .kicker { font-family: var(--mono); font-size: 22px; letter-spacing: 8px; color: var(--accent); text-transform: uppercase; }
+
+  .card { background: var(--panel); border: 2px solid var(--line2); border-radius: 18px; }
+  .pill { display: inline-block; font-family: var(--mono); font-weight: 700; font-size: 20px; letter-spacing: 2px;
+          padding: 6px 14px; border-radius: 8px; border: 2px solid; }
+  .ok { color: var(--ok); border-color: rgba(63,208,127,.45); background: #0e2a1b; }
+  .warn { color: var(--warn); border-color: rgba(242,179,61,.45); background: #2d220b; }
+  .bad { color: var(--bad); border-color: rgba(255,92,92,.45); background: #2e1012; }
+
+  /* GPU chip */
+  .chip { width: 340px; height: 340px; border-radius: 28px; border: 3px solid var(--warn);
+          background: linear-gradient(145deg, #1a1f12, #0d1117 60%); display: flex; flex-direction: column;
+          align-items: center; justify-content: center; }
+  .chip .die { width: 150px; height: 150px; border-radius: 14px; border: 3px dashed rgba(242,179,61,.8);
+               display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700;
+               font-size: 30px; color: var(--warn); }
+  .pins { position: absolute; background: repeating-linear-gradient(90deg, var(--warn) 0 10px, transparent 10px 26px); height: 16px; }
+  .pinsv { position: absolute; background: repeating-linear-gradient(0deg, var(--warn) 0 10px, transparent 10px 26px); width: 16px; }
+
+  /* pipeline */
+  .node { position: absolute; top: 0; width: 170px; text-align: center; }
+  .node .dot { width: 30px; height: 30px; margin: 0 auto 12px; border-radius: 50%; border: 3px solid var(--line2); background: var(--panel); }
+  .node .lbl { font-family: var(--mono); font-size: 17px; letter-spacing: 2px; color: var(--dim); font-weight: 700; }
+
+  .doc { width: 230px; height: 290px; border-radius: 14px; background: #eef2f6; color: #1b2430; padding: 26px 22px;
+         box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .doc .ln { height: 10px; border-radius: 5px; background: #c6cfda; margin-bottom: 14px; }
+  .doc .tt { font-family: var(--mono); font-size: 18px; font-weight: 700; margin-bottom: 22px; }
+
+  .term { font-family: var(--mono); font-size: 24px; color: var(--muted); }
+  .term b { color: var(--ok); font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="grid"></div>
+  <canvas id="fx" width="1920" height="1080"></canvas>
+
+  <!-- S1: hook -->
+  <div class="layer" id="s1">
+    <div class="abs" id="s1chip" style="left:790px; top:250px;">
+      <div class="chip" style="border-color:var(--bad)"><div class="die" style="border-color:rgba(255,92,92,.8); color:var(--bad)">GPU</div></div>
+    </div>
+    <div class="abs mono" id="s1meter" style="left:0; right:0; top:630px; text-align:center; font-size:30px; color:var(--bad)"></div>
+    <div class="abs center h2" id="s1t1" style="top:730px">Un GPU allumé 24h/24…</div>
+    <div class="abs center cap" id="s1t2" style="top:815px; color:var(--muted)">…qui attend du travail qui n'arrive que quelques fois par jour.</div>
+  </div>
+
+  <!-- S2: options -->
+  <div class="layer" id="s2">
+    <div class="abs center h2" style="top:150px">Analyser un document sensible avec l'IA&nbsp;?</div>
+    <div class="abs card" id="s2a" style="left:250px; top:330px; width:640px; height:400px; padding:44px;">
+      <div class="kicker" style="color:var(--muted); letter-spacing:4px">Option 1</div>
+      <div style="font-size:44px; font-weight:700; margin:18px 0 26px">API d'IA externe</div>
+      <div style="font-size:30px; color:var(--muted); line-height:1.5">Le document quitte<br/>votre infrastructure.</div>
+      <div class="abs pill bad" id="s2ax" style="right:40px; top:40px; font-size:34px">✕</div>
+    </div>
+    <div class="abs card" id="s2b" style="left:1030px; top:330px; width:640px; height:400px; padding:44px;">
+      <div class="kicker" style="color:var(--muted); letter-spacing:4px">Option 2</div>
+      <div style="font-size:44px; font-weight:700; margin:18px 0 26px">GPU permanent</div>
+      <div style="font-size:30px; color:var(--muted); line-height:1.5">Payé pour attendre.<br/>Des données sur un disque<br/>qui ne s'éteint jamais.</div>
+      <div class="abs pill bad" id="s2bx" style="right:40px; top:40px; font-size:34px">✕</div>
+    </div>
+    <div class="abs center cap" id="s2t" style="top:820px; color:var(--warn)">Il manque une troisième voie.</div>
+  </div>
+
+  <!-- S3: logo -->
+  <div class="layer" id="s3">
+    <div class="abs" id="s3logo" style="left:0; right:0; top:330px; display:flex; justify-content:center; align-items:center; gap:34px">
+      <svg width="120" height="120" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="#e6edf3" stroke-width="1.4"/>
+        <rect x="7.5" y="7.5" width="9" height="9" rx="1" fill="none" stroke="#76b900" stroke-width="1.2" stroke-dasharray="2 2"/>
+        <circle cx="12" cy="12" r="1.6" fill="#76b900"/></svg>
+      <div class="mono" id="s3word" style="font-size:120px; font-weight:700; letter-spacing:34px">EPHEMERA</div>
+    </div>
+    <div class="abs center h2" id="s3t1" style="top:560px">L'inférence IA qui disparaît</div>
+    <div class="abs center h2" id="s3t2" style="top:630px; color:var(--accent)">quand le travail est fini.</div>
+    <div class="abs center kicker" id="s3t3" style="top:780px; color:var(--muted)">Orchestrateur open source · GPU éphémère</div>
+  </div>
+
+  <!-- HUD (S4-S5) -->
+  <div class="layer" id="hud">
+    <div class="abs card" style="left:70px; top:60px; width:470px; height:200px; padding:26px 32px" id="hudcard">
+      <div class="mono" style="font-size:18px; letter-spacing:5px; color:var(--muted)">ACTIVE GPU INSTANCES</div>
+      <div style="display:flex; align-items:flex-end; gap:22px; margin-top:6px">
+        <div class="mono" id="hudnum" style="font-size:112px; font-weight:700; line-height:1">0</div>
+        <div id="hudpill" class="pill ok" style="margin-bottom:18px">COMPUTE = 0</div>
+      </div>
+    </div>
+    <div class="abs mono" id="hudmode" style="right:70px; top:70px; font-size:18px; letter-spacing:4px; color:var(--dim)">NVIDIA BREV · vLLM · OPEN-WEIGHT LLM</div>
+  </div>
+
+  <!-- S4/S5 shared actors -->
+  <div class="layer" id="act">
+    <div class="abs doc" id="doc"><div class="tt" id="doctitle">contrat.pdf</div>
+      <div class="ln" style="width:90%"></div><div class="ln"></div><div class="ln" style="width:75%"></div>
+      <div class="ln"></div><div class="ln" style="width:60%"></div><div class="ln" style="width:85%"></div><div class="ln" style="width:40%"></div></div>
+    <div class="abs" id="chipwrap" style="left:790px; top:300px;">
+      <div class="pins" style="left:40px; top:-22px; width:260px"></div>
+      <div class="pins" style="left:40px; bottom:-22px; width:260px"></div>
+      <div class="pinsv" style="top:40px; left:-22px; height:260px"></div>
+      <div class="pinsv" style="top:40px; right:-22px; height:260px"></div>
+      <div class="chip" id="chip">
+        <div class="die" id="die">L40S</div>
+        <div class="mono" id="chipsub" style="margin-top:22px; font-size:18px; color:var(--muted); letter-spacing:2px">48 GB VRAM</div>
+        <div id="barwrap" style="margin-top:18px; width:220px; height:10px; border-radius:5px; background:#1e2733; overflow:hidden">
+          <div id="bar" style="height:100%; width:0; background:var(--accent)"></div></div>
+      </div>
+    </div>
+    <div class="abs term" id="chipinfo" style="left:560px; top:690px; width:800px; text-align:center"></div>
+    <div class="abs mono" id="instname" style="left:760px; top:258px; width:400px; text-align:center; font-size:18px; color:var(--warn); letter-spacing:2px">ephemera-8f32ab001111</div>
+
+    <div class="abs card" id="result" style="left:1270px; top:300px; width:560px; height:360px; padding:30px">
+      <div class="mono" style="font-size:18px; letter-spacing:4px; color:var(--muted)">RÉSULTAT STRUCTURÉ</div>
+      <div style="font-size:26px; font-weight:700; margin:16px 0 14px">Contrat de services</div>
+      <div class="ln2" style="height:10px; width:95%; background:#2b3746; border-radius:5px; margin-bottom:12px"></div>
+      <div class="ln2" style="height:10px; width:80%; background:#2b3746; border-radius:5px; margin-bottom:24px"></div>
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <div><span class="pill bad" style="font-size:16px">HIGH</span> <span style="font-size:22px; margin-left:8px">Indemnisation non plafonnée</span></div>
+        <div><span class="pill warn" style="font-size:16px">MEDIUM</span> <span style="font-size:22px; margin-left:8px">Renouvellement automatique</span></div>
+        <div><span class="pill warn" style="font-size:16px">REVIEW</span> <span style="font-size:22px; margin-left:8px">Revue humaine requise</span></div>
+      </div>
+    </div>
+
+    <div class="abs" id="failtag" style="left:0; right:0; top:170px; text-align:center">
+      <span class="pill bad" style="font-size:44px; padding:14px 30px; letter-spacing:6px">INFERENCE FAILED</span></div>
+    <div class="abs" id="checks" style="left:1280px; top:330px; display:flex; flex-direction:column; gap:26px"></div>
+
+    <div class="abs" id="zero" style="left:0; right:0; top:330px; text-align:center">
+      <div class="mono" style="display:inline-block; font-size:130px; font-weight:700; letter-spacing:10px; color:var(--ok);
+           border:6px solid rgba(63,208,127,.6); border-radius:26px; padding:24px 60px; background:rgba(14,42,27,.85)">COMPUTE = 0</div>
+    </div>
+  </div>
+
+  <!-- pipeline -->
+  <div class="layer" id="pipe"><div class="abs" id="pipeinner" style="left:120px; top:870px; width:1680px; height:80px"></div></div>
+
+  <!-- captions -->
+  <div class="abs center cap" id="caption" style="top:990px; font-size:36px; opacity:0"></div>
+
+  <!-- S6: pillars -->
+  <div class="layer" id="s6">
+    <div class="abs center h2" style="top:110px">Un orchestrateur, pas une interface d'IA de plus.</div>
+    <div class="abs" id="pillars" style="left:150px; top:250px; width:1620px; display:grid; grid-template-columns:1fr 1fr; gap:30px"></div>
+    <div class="abs center mono" id="stack" style="top:900px; font-size:24px; letter-spacing:4px; color:var(--muted)">NVIDIA BREV · vLLM · FASTAPI · POSTGRESQL · NEXT.JS · 146 TESTS</div>
+  </div>
+
+  <!-- S7: outro -->
+  <div class="layer" id="s7">
+    <div class="abs center" id="s7a" style="top:270px; font-size:84px; font-weight:700">Provision.</div>
+    <div class="abs center" id="s7b" style="top:380px; font-size:84px; font-weight:700">Infer.</div>
+    <div class="abs center" id="s7c" style="top:490px; font-size:84px; font-weight:700; color:var(--accent)">Destroy.</div>
+    <div class="abs center" id="s7z" style="top:640px"><span class="pill ok" style="font-size:44px; padding:12px 30px; letter-spacing:8px">COMPUTE = 0</span></div>
+    <div class="abs center mono" id="s7l" style="top:780px; font-size:48px; font-weight:700; letter-spacing:22px">EPHEMERA</div>
+    <div class="abs center" id="s7d" style="top:1000px; font-size:20px; color:var(--dim)">Prototype hackathon · données synthétiques · suppression des données au niveau applicatif</div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const eo = (x) => 1 - Math.pow(1 - x, 3);            // ease-out cubic
+const eio = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const lerp = (a, b, x) => a + (b - a) * x;
+// fade in over [a, a+d], out over [b-d, b]
+const win = (t, a, b, d = .5) => Math.min(seg(t, a, a + d), 1 - seg(t, b - d, b));
+
+function set(el, o) { const s = (typeof el === "string" ? $(el) : el).style; for (const k in o) s[k] = o[k]; }
+function show(el, op, dy = 0, sc = 1) { set(el, { opacity: op, transform: `translateY(${dy}px) scale(${sc})` }); }
+
+// deterministic particles
+function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const PARTS = (() => { const r = rng(7), out = []; for (let i = 0; i < 520; i++) out.push({
+  x: r(), y: r(), a: r() * Math.PI * 2, v: 120 + r() * 520, s: 2 + r() * 5, d: r() * .35 }); return out; })();
+const fx = $("fx").getContext("2d");
+function burst(rect, p, color, inward = false) {
+  // p: 0..1 progress. inward=true: particles converge (assemble)
+  if (p <= 0 || p >= 1) return;
+  fx.fillStyle = color;
+  for (const q of PARTS) {
+    const local = clamp((p - q.d) / (1 - q.d));
+    if (local <= 0 || local >= 1) continue;
+    const k = inward ? 1 - eo(local) : eo(local);
+    const x0 = rect.x + q.x * rect.w, y0 = rect.y + q.y * rect.h;
+    const x = x0 + Math.cos(q.a) * q.v * k, y = y0 + Math.sin(q.a) * q.v * k;
+    fx.globalAlpha = inward ? eo(local) * .9 : (1 - local) * .9;
+    fx.fillRect(x, y, q.s, q.s);
+  }
+  fx.globalAlpha = 1;
+}
+
+// pipeline nodes
+const STAGES = ["QUEUED", "PROVISION", "BOOTSTRAP", "MODEL", "INFER", "CLEAN", "DESTROY", "VERIFY", "COMPUTE = 0"];
+const pipe = $("pipeinner");
+STAGES.forEach((s, i) => {
+  const n = document.createElement("div"); n.className = "node"; n.style.left = `${i * 188}px`;
+  n.innerHTML = `<div class="dot"></div><div class="lbl">${s}</div>`; pipe.appendChild(n);
+  if (i < STAGES.length - 1) { const l = document.createElement("div"); l.className = "abs";
+    Object.assign(l.style, { left: `${i * 188 + 101}px`, top: "14px", width: "156px", height: "3px", background: "#1e2733" });
+    l.innerHTML = `<div class="fill" style="height:100%;width:0;background:#76b900"></div>`; pipe.appendChild(l); }
+});
+const nodes = [...pipe.querySelectorAll(".node")], links = [...pipe.querySelectorAll(".fill")];
+function pipeline(times, t, failAt = -1) {
+  nodes.forEach((n, i) => {
+    const dot = n.querySelector(".dot"), lbl = n.querySelector(".lbl");
+    const on = t >= times[i], next = i + 1 < times.length ? t >= times[i + 1] : false;
+    let c = "#2b3746", bg = "#0d1117", fc = "#5b6776", glow = "none";
+    if (on) {
+      const failed = i === failAt;
+      const last = i === STAGES.length - 1;
+      c = failed ? "#ff5c5c" : (next || last ? "#3fd07f" : "#f2b33d");
+      bg = c; fc = failed ? "#ff5c5c" : (last ? "#3fd07f" : (next ? "#e6edf3" : "#f2b33d"));
+      if (!next && !failed && !last) glow = `0 0 ${18 + 10 * Math.sin(t * 8)}px rgba(242,179,61,.7)`;
+      if (last) glow = "0 0 24px rgba(63,208,127,.8)";
+    }
+    set(dot, { borderColor: c, background: bg, boxShadow: glow });
+    set(lbl, { color: fc });
+  });
+  links.forEach((l, i) => set(l, { width: `${100 * clamp(seg(t, times[i], times[i + 1]) )}%` }));
+}
+
+const checks = $("checks");
+["Données temporaires effacées", "GPU détruit", "Absence vérifiée chez Brev"].forEach((txt) => {
+  const d = document.createElement("div");
+  d.innerHTML = `<span class="pill ok" style="font-size:26px">✓</span><span style="font-size:32px;margin-left:18px;font-weight:600">${txt}</span>`;
+  checks.appendChild(d);
+});
+const pillars = $("pillars");
+[["Détruit sur chaque chemin", "Succès, panne, timeout, annulation, arrêt du worker : destruction tentée et vérifiée."],
+ ["Vérifié côté fournisseur", "COMPUTE = 0 uniquement si la base ET la liste Brev sont d'accord."],
+ ["Auditable", "Chaque transition horodatée. Aucun texte, prompt ou secret dans les logs."],
+ ["Document = donnée non fiable", "Modèle sans outils, endpoint en 127.0.0.1, sortie validée par schéma."]]
+.forEach(([h, p]) => { const d = document.createElement("div"); d.className = "card"; d.style.padding = "34px 38px";
+  d.innerHTML = `<div style="font-size:36px;font-weight:700;color:var(--accent)">${h}</div><div style="font-size:26px;color:var(--muted);margin-top:14px;line-height:1.45">${p}</div>`;
+  pillars.appendChild(d); });
+
+function caption(t, list) {
+  let txt = "", op = 0, color = "#e6edf3";
+  for (const [a, b, s, c] of list) if (t >= a && t < b) { txt = s; op = win(t, a, b, .35); color = c || color; }
+  const el = $("caption"); if (el.textContent !== txt) el.textContent = txt; set(el, { opacity: op, color });
+}
+
+const CHIP = { x: 790, y: 300, w: 340, h: 340 };
+const DUR = 57;
+
+function render(t) {
+  fx.clearRect(0, 0, 1920, 1080);
+
+  // ---------- S1 hook (0 - 5.5)
+  const s1 = win(t, 0, 5.8, .6);
+  set("s1", { opacity: s1 });
+  if (s1 > 0) {
+    const pulse = .5 + .5 * Math.sin(t * 5);
+    set("s1chip", { transform: `scale(${1 + .02 * pulse})`, filter: `drop-shadow(0 0 ${20 + 30 * pulse}px rgba(255,92,92,.45))` });
+    const hours = Math.floor(lerp(0, 24, seg(t, .4, 5)));
+    $("s1meter").textContent = `IDLE · ${String(hours).padStart(2, "0")}:00 / 24:00 · $$$`;
+    show("s1t1", eo(seg(t, .6, 1.4)), 30 * (1 - eo(seg(t, .6, 1.4))));
+    show("s1t2", eo(seg(t, 1.8, 2.6)), 30 * (1 - eo(seg(t, 1.8, 2.6))));
+  }
+
+  // ---------- S2 options (5.5 - 11)
+  const s2 = win(t, 5.5, 11.2, .5);
+  set("s2", { opacity: s2 });
+  if (s2 > 0) {
+    show("s2a", eo(seg(t, 5.8, 6.6)), 60 * (1 - eo(seg(t, 5.8, 6.6))));
+    show("s2b", eo(seg(t, 6.6, 7.4)), 60 * (1 - eo(seg(t, 6.6, 7.4))));
+    const x1 = eo(seg(t, 8, 8.4)), x2 = eo(seg(t, 8.5, 8.9));
+    set("s2ax", { opacity: x1, transform: `scale(${lerp(2.2, 1, x1)})` });
+    set("s2bx", { opacity: x2, transform: `scale(${lerp(2.2, 1, x2)})` });
+    show("s2t", eo(seg(t, 9.2, 9.8)), 20 * (1 - eo(seg(t, 9.2, 9.8))));
+  }
+
+  // ---------- S3 logo (11 - 15.5)
+  const s3 = win(t, 11, 15.6, .5);
+  set("s3", { opacity: s3 });
+  if (s3 > 0) {
+    const k = eo(seg(t, 11.2, 12.4));
+    set("s3logo", { opacity: k, transform: `scale(${lerp(.85, 1, k)})`, filter: `blur(${8 * (1 - k)}px)` });
+    set("s3word", { letterSpacing: `${lerp(80, 34, k)}px` });
+    show("s3t1", eo(seg(t, 12.4, 13)), 24 * (1 - eo(seg(t, 12.4, 13))));
+    show("s3t2", eo(seg(t, 12.8, 13.4)), 24 * (1 - eo(seg(t, 12.8, 13.4))));
+    show("s3t3", eo(seg(t, 13.6, 14.2)));
+  }
+
+  // ---------- HUD + actors (15.5 - 45)
+  const hud = win(t, 15.5, 45.2, .6);
+  set("hud", { opacity: hud }); set("act", { opacity: hud }); set("pipe", { opacity: win(t, 15.5, 44.8, .6) });
+
+  let gpu = 0;              // active GPU count shown
+  let chipOp = 0, chipAssemble = 0, chipDissolve = 0, fail = false;
+  const u = t - 15.5, v = t - 37;
+
+  if (t >= 15.5 && t < 37) {
+    // S4 stage times (u)
+    const T = [3, 4, 7, 8.5, 11, 14, 15.5, 17.5, 19];
+    pipeline(T, u);
+    // document
+    const din = eo(seg(u, 1.5, 2.8));
+    const dx = lerp(-300, 330, din), dy = 340;
+    const toChip = eio(seg(u, 11, 12.2));
+    const docX = lerp(dx, 845, toChip), docY = lerp(dy, 330, toChip), docS = lerp(1, .5, toChip);
+    const docGone = seg(u, 14, 15);
+    $("doctitle").textContent = "contrat.pdf";
+    set("doc", { left: `${docX}px`, top: `${docY}px`, opacity: din * (1 - docGone) * (u > 12.2 ? 0 : 1), transform: `scale(${docS})` });
+    if (u > 12.2 && u < 15.2) burst({ x: 845, y: 400, w: 120, h: 150 }, seg(u, 14, 15.2), "#c6cfda");
+    // chip
+    chipAssemble = seg(u, 4, 6.2); chipDissolve = seg(u, 15.5, 17.4);
+    chipOp = eo(seg(u, 5.2, 6.2)) * (1 - eo(seg(u, 15.5, 16.4)));
+    gpu = u >= 5.6 && u < 19 ? 1 : 0;
+    set("chipsub", { opacity: seg(u, 7, 7.6) });
+    $("die").textContent = u < 7 ? "GPU" : "L40S";
+    set("bar", { width: `${100 * eio(seg(u, 8.5, 10.8))}%` });
+    set("barwrap", { opacity: seg(u, 8.5, 8.8) * (1 - seg(u, 11, 11.3)) });
+    set("instname", { opacity: seg(u, 5.6, 6.2) * (1 - seg(u, 15.5, 16.3)) });
+    let info = "";
+    if (u >= 4 && u < 7) info = "brev create · L40S → fallbacks";
+    else if (u >= 7 && u < 8.5) info = "nvidia-smi <b>✓</b> docker <b>✓</b> runtime <b>✓</b>";
+    else if (u >= 8.5 && u < 11) info = "vLLM · 127.0.0.1:8000 only";
+    else if (u >= 11 && u < 14) info = "document = donnée non fiable";
+    else if (u >= 15.5 && u < 17.5) info = "brev delete ephemera-8f32…";
+    else if (u >= 17.5 && u < 19.5) info = "brev ls → absent <b>✓</b>";
+    $("chipinfo").innerHTML = info; set("chipinfo", { opacity: info ? 1 : 0 });
+    // result
+    const r = eo(seg(u, 12.4, 13.2));
+    show("result", r * (1 - seg(u, 18.6, 19.1)), 40 * (1 - r));
+    set("checks", { opacity: 0 }); set("failtag", { opacity: 0 });
+    // zero stamp
+    const z = seg(u, 19, 19.5);
+    set("zero", { opacity: z * (1 - seg(u, 21, 21.5)), transform: `scale(${lerp(1.35, 1, eo(z))})` });
+    caption(u, [
+      [0.2, 2.9, "Aucun GPU ne tourne. Il n'existe pas."],
+      [3, 6.8, "Un document arrive → Ephemera crée un GPU à la demande."],
+      [7, 11, "Environnement vérifié. Modèle open-weight chargé en local."],
+      [11, 14, "Inférence. Résultat structuré et validé."],
+      [14, 18.9, "Nettoyage. Destruction. Vérification."],
+      [19, 21.5, "Le travail est fini. Le calcul a disparu.", "#3fd07f"],
+    ]);
+  } else if (t >= 37 && t < 45.5) {
+    // S5 failure (v)
+    const T = [0.2, 0.6, 1.2, 1.7, 2.3, 4.4, 5.1, 5.8, 6.4];
+    pipeline(T, v, 4);
+    const din = eo(seg(v, 0, .7));
+    $("doctitle").textContent = "politique.pdf";
+    set("doc", { left: `${lerp(-300, 330, din)}px`, top: "340px", opacity: din * (1 - seg(v, 4.4, 5)), transform: "scale(1)" });
+    burst({ x: 330, y: 340, w: 230, h: 290 }, seg(v, 4.4, 5.4), "#c6cfda");
+    chipAssemble = seg(v, .4, 1.6); chipDissolve = seg(v, 5.1, 6.6);
+    chipOp = eo(seg(v, 1, 1.6)) * (1 - eo(seg(v, 5.1, 5.9)));
+    gpu = v >= 1.2 && v < 6.4 ? 1 : 0;
+    $("die").textContent = "L40S"; set("chipsub", { opacity: 1 }); set("barwrap", { opacity: 0 });
+    set("instname", { opacity: seg(v, 1.2, 1.6) * (1 - seg(v, 5.1, 5.8)) });
+    fail = v >= 2.9 && v < 5.1;
+    $("chipinfo").innerHTML = v >= 5.8 && v < 7 ? "brev ls → absent <b>✓</b>" : (v >= 2.9 && v < 4.4 ? "<span style='color:#ff5c5c'>erreur d'inférence injectée</span>" : "");
+    set("chipinfo", { opacity: 1 });
+    const ft = seg(v, 2.9, 3.2);
+    const jitter = v < 3.6 ? Math.sin(v * 90) * 10 * (1 - seg(v, 2.9, 3.6)) : 0;
+    set("failtag", { opacity: ft * (1 - seg(v, 7.2, 7.6)), transform: `translateX(${jitter}px) scale(${lerp(1.4, 1, eo(ft))})` });
+    show("result", 0);
+    set("checks", { opacity: 1 });
+    [...checks.children].forEach((c, i) => { const k = eo(seg(v, 4.5 + i * .75, 4.9 + i * .75)); show(c, k, 20 * (1 - k)); });
+    set("zero", { opacity: 0 });
+    caption(v, [
+      [0.1, 2.8, "Deuxième job. Cette fois, on casse l'inférence."],
+      [2.9, 4.4, "L'inférence échoue…", "#ff5c5c"],
+      [4.4, 8.3, "…et le GPU est quand même détruit. À chaque fois.", "#3fd07f"],
+    ]);
+  } else { caption(0, []); }
+
+  // chip drawing
+  set("chipwrap", { opacity: chipOp, transform: `scale(${lerp(.9, 1, eo(chipAssemble))})`,
+    filter: fail ? "drop-shadow(0 0 40px rgba(255,92,92,.7))" : `drop-shadow(0 0 ${30 * chipOp}px rgba(242,179,61,.35))` });
+  set("chip", { borderColor: fail ? "#ff5c5c" : "#f2b33d" });
+  burst(CHIP, chipAssemble, "#f2b33d", true);
+  burst(CHIP, chipDissolve, "#f2b33d", false);
+
+  // HUD
+  $("hudnum").textContent = String(gpu);
+  set("hudnum", { color: gpu ? "#f2b33d" : "#3fd07f" });
+  const pill = $("hudpill");
+  pill.className = "pill " + (gpu ? "warn" : "ok"); pill.textContent = gpu ? "GPU ACTIVE" : "COMPUTE = 0";
+  set("hudcard", { borderColor: gpu ? "rgba(242,179,61,.6)" : "rgba(63,208,127,.45)",
+    boxShadow: gpu ? `0 0 ${20 + 12 * Math.sin(t * 6)}px rgba(242,179,61,.35)` : "none" });
+
+  // ---------- S6 pillars (45 - 51)
+  const s6 = win(t, 45.2, 51.2, .5);
+  set("s6", { opacity: s6 });
+  if (s6 > 0) [...pillars.children].forEach((c, i) => { const k = eo(seg(t, 45.5 + i * .35, 46.1 + i * .35)); show(c, k, 40 * (1 - k)); });
+  if (s6 > 0) show("stack", eo(seg(t, 47.4, 48)));
+
+  // ---------- S7 outro (51 - 57)
+  const s7 = seg(t, 51, 51.5) * (1 - seg(t, 56.4, 57));
+  set("s7", { opacity: s7 });
+  if (s7 > 0) {
+    ["s7a", "s7b", "s7c"].forEach((id, i) => { const k = eo(seg(t, 51.3 + i * .45, 51.8 + i * .45)); show(id, k, 30 * (1 - k)); });
+    const z = eo(seg(t, 53, 53.4)); set("s7z", { opacity: z, transform: `scale(${lerp(1.3, 1, z)})` });
+    show("s7l", eo(seg(t, 53.8, 54.4))); show("s7d", seg(t, 54.2, 54.8));
+  }
+}
+window.DURATION = DUR;
+window.render = render;
+// Live preview when opened in a browser (the recorder calls render(t) itself).
+if (!new URLSearchParams(location.search).has("record")) {
+  const start = performance.now();
+  const loop = () => { render(((performance.now() - start) / 1000) % DUR); requestAnimationFrame(loop); };
+  loop();
+} else { render(0); }
+</script>
+</body>
+</html>
