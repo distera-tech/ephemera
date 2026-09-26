@@ -1,0 +1,86 @@
+# Deployment
+
+## Validation status
+
+| Path | Status |
+|---|---|
+| Simulation mode (API, worker, PostgreSQL, UI, Compose) | **Validated** — unit/integration tests, Playwright E2E against `docker compose` |
+| Real-mode code path (Brev adapter, GPU selection, vLLM bootstrap protocol, teardown) | **Validated against a fake `brev` CLI** that mirrors brev-cli v0.6.335 syntax and JSON output, plus the real `bootstrap.sh` run with stubbed `nvidia-smi`/`docker`/`curl` |
+| **Real Brev GPU provisioning + real vLLM inference** | **Pending credentials.** The build environment had no `BREV_API_KEY` and its network policy blocked the Brev API and Hugging Face. It has **not** been run against real infrastructure. Run `scripts/real_smoke_test.py` (below) before relying on it. |
+
+Brev CLI facts were verified from `brev --help` and source of v0.6.335 (built from the
+Go module proxy), not from memory — see `docs/implementation-plan.md` §0.
+
+## Local (simulation)
+
+```bash
+cp .env.example .env          # EPHEMERA_MODE=simulation — no credentials needed
+make up                       # docker compose: postgres, migrate, api, worker, web
+open http://localhost:3000
+```
+
+Without Docker: PostgreSQL 16 on localhost, then `make install migrate`, and `make api`,
+`make worker`, `make web` in three terminals.
+
+## Real mode (NVIDIA Brev)
+
+1. **Credentials** (in `.env`, never committed):
+   * `BREV_API_KEY` — the CLI reads it natively; the worker refuses to start in real mode
+     without it (or `BREV_ALLOW_CLI_LOGIN=true` after `brev login` in `BREV_HOME`).
+   * `BREV_ORG` — optional; the worker runs `brev set <org>` once.
+   * `HF_TOKEN` — needed for gated models such as `meta-llama/Llama-3.1-8B-Instruct`.
+     Accept the model licence on Hugging Face first and use a **read-only** token.
+2. **Model**: `MODEL_ID` is configurable. Verify the licence, gating and that it fits the
+   selected GPU (an 8B model in bf16 needs ~16 GB for weights; `GPU_MIN_VRAM_GB=40`
+   leaves room for KV cache at `VLLM_MAX_MODEL_LEN=16384`). Llama models are
+   *open-weight*, not open source.
+3. **GPU**: `GPU_PREFERENCE=L40S`, `GPU_MIN_VRAM_GB=40`, fallbacks in
+   `GPU_FALLBACK_TYPES`. Preview what would be chosen without creating anything:
+   ```bash
+   BREV_API_KEY=… brev search gpu --min-total-vram 40 --min-capability 8.0 --sort price
+   ```
+   Pin exact types with `BREV_INSTANCE_TYPES=type1,type2` if you want determinism.
+4. **Image assumptions**: Brev VM-mode instances with NVIDIA driver, Docker and the NVIDIA
+   container runtime. `bootstrap.sh prepare` verifies all three and fails the job
+   (`BOOTSTRAP_FAILED`, GPU destroyed) otherwise. Docker commands run on the host
+   (`brev exec --host`, `BREV_EXEC_ON_HOST=true`).
+5. **Timeouts**: first runs pull the vLLM image (several GB) and the model weights (~16 GB for an 8B bf16 model) onto
+   a fresh instance. Defaults: provisioning 600 s, model ready 900 s, job 1800 s.
+   Measure with the smoke test and adjust.
+6. **Start**: set `EPHEMERA_MODE=real` and `make up`. The UI shows "Real mode · Brev".
+
+### Real smoke test (costs money)
+
+```bash
+cd apps/api
+uv run alembic upgrade head
+uv run python ../../scripts/real_smoke_test.py --yes
+```
+
+It runs the production orchestrator twice — a normal job and one with inference failure
+injected — prints per-phase timings, the GPU reported by `nvidia-smi`, all lifecycle
+events, and fails unless both runs end with the instance destroyed and **no
+`ephemera-*` instance remains** in `brev ls`. Stop the Compose worker first (or run the
+test against a separate database), since both would compete for `MAX_GPU_INSTANCES`.
+
+Record the output in this file when done:
+
+| Date | GPU / type | Provisioning | Model loading | Inference | Destruction | GPU runtime | Result |
+|---|---|---|---|---|---|---|---|
+| _pending_ | | | | | | | |
+
+## Operating notes
+
+* Stop the worker with SIGTERM (`docker compose stop worker`), not SIGKILL: it cancels
+  the running job and completes destroy + verify first (grace period 10 min).
+* A job in `CLEANUP_FAILED` blocks new provisioning while `MAX_GPU_INSTANCES` is
+  reached. Check `brev ls`; reconciliation retries every `RECONCILE_INTERVAL_SECONDS`.
+* `RECONCILE_DELETE_UNKNOWN_INSTANCES=false` (default) means `ephemera-*` instances not in
+  this database are only reported. Set it to `true` only if this deployment is the sole
+  user of the `ephemera-` prefix in the Brev org.
+* Ephemera never runs `brev delete` on anything that does not match `ephemera-<12 hex>`,
+  and has no "delete all" code path.
+* Behind a TLS-intercepting proxy, build with `EXTRA_CA_CERT=/path/ca.pem make up`; the CA
+  is used during the build only and not baked into the runtime images.
+* Put a real authentication layer in front before exposing beyond localhost
+  (see threat model T10).

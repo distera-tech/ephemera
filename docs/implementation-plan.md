@@ -1,6 +1,6 @@
 # Ephemera — Implementation Plan
 
-Status legend: ✅ done · 🟡 implemented, real-infra validation pending · ⬜ not started
+Status legend: ✅ done and verified here · 🟡 implemented and tested against fakes; real-infra validation pending · ⬜ not started
 
 ## 0. Observations (environment inspection, 2026-09-26)
 
@@ -32,16 +32,16 @@ Status legend: ✅ done · 🟡 implemented, real-infra validation pending · �
 | # | Phase | Objective | Key files | Acceptance criteria | Tests | Status |
 |---|---|---|---|---|---|---|
 | 1 | Domain | State machine, error codes, value objects, ports | `app/domain/*` | Illegal transitions rejected; terminal states final | `test_state_machine.py` | ✅ |
-| 2 | Persistence | `jobs`, `job_events`, `worker_heartbeats`; Alembic | `app/infrastructure/database/*`, `alembic/` | `alembic upgrade head` on empty DB; no document body columns | `test_repository.py` | ✅ |
+| 2 | Persistence | `jobs`, `job_events`, `worker_heartbeats`; Alembic | `app/infrastructure/database/*`, `alembic/` | `alembic upgrade head` on empty DB; no document body columns | `test_limits_and_reconciliation.py` | ✅ |
 | 3 | API | Upload, list, detail, events, cancel, health, readiness, stats | `app/api/*` | 202 on create; oversized/non-PDF rejected before any compute | `test_api.py` | ✅ |
 | 4 | Documents | PyMuPDF extraction in a sandboxed subprocess with timeout + page limit | `app/infrastructure/documents/*` | Malformed PDF → `DOCUMENT_INVALID` before provisioning | `test_documents.py` | ✅ |
-| 5 | Orchestrator | PROVISION→INFER→CLEAN→DESTROY→VERIFY with `finally` destroy | `app/application/orchestrator.py` | Destroy attempted on every exit path after a provision attempt | `test_orchestrator.py` (10 critical tests) | ✅ |
-| 6 | Simulation | `EPHEMERA_MODE=simulation` compute + inference providers | `app/infrastructure/compute/simulated.py`, `inference/simulated.py` | Full lifecycle without credentials; UI badge | `test_e2e_simulation.py` | ✅ |
-| 7 | Brev adapter | `BrevClient` + `BrevComputeProvider`, GPU selection | `app/infrastructure/brev/*` | Arg arrays, timeouts, sanitized env, prefix guard on delete | `test_brev_client.py` against a fake `brev` binary | 🟡 |
-| 8 | vLLM | `VLLMProvider` over the remote executor; bootstrap script | `app/infrastructure/inference/vllm.py`, `infra/gpu/bootstrap.sh` | Localhost-only endpoint, JSON-schema output, retry once | fake-brev real-mode E2E | 🟡 |
-| 9 | Worker | Claim loop (`SKIP LOCKED`), limits, heartbeats, SIGTERM handling, reconciliation | `app/workers/*`, `app/application/reconciliation.py` | Restart recovers in-flight jobs and destroys their instances | `test_reconciliation.py` | ✅ |
+| 5 | Orchestrator | PROVISION→INFER→CLEAN→DESTROY→VERIFY with `finally` destroy | `app/application/orchestrator.py` | Destroy attempted on every exit path after a provision attempt | `test_orchestrator.py` | ✅ |
+| 6 | Simulation | `EPHEMERA_MODE=simulation` compute + inference providers | `app/infrastructure/compute/simulated.py`, `inference/simulated.py` | Full lifecycle without credentials; UI badge | `test_api.py::test_e2e_*`, Playwright | ✅ |
+| 7 | Brev adapter | `BrevClient` + `BrevComputeProvider`, GPU selection | `app/infrastructure/brev/*` | Arg arrays, timeouts, sanitized env, prefix guard on delete | `test_brev_adapter.py` against a fake `brev` binary | 🟡 |
+| 8 | vLLM | `VLLMProvider` over the remote executor; bootstrap script | `app/infrastructure/inference/vllm.py`, `infra/gpu/bootstrap.sh` | Localhost-only endpoint, JSON-schema output, retry once | `test_real_mode_with_fake_brev.py`, `test_bootstrap_script.py` | 🟡 |
+| 9 | Worker | Claim loop (`SKIP LOCKED`), limits, heartbeats, SIGTERM handling, reconciliation | `app/workers/*`, `app/application/reconciliation.py` | Restart recovers in-flight jobs and destroys their instances | `test_limits_and_reconciliation.py` | ✅ |
 | 10 | Frontend | Control plane, job timeline, COMPUTE = 0 hero, landing, architecture | `apps/web/*` | Reflects backend state via polling | Playwright `lifecycle.spec.ts` | ✅ |
-| 11 | Ops | Dockerfiles, Compose, Makefile, CI | `infra/*`, `Makefile`, `.github/workflows/ci.yml` | `docker compose up` works in simulation | manual + CI | ✅ |
+| 11 | Ops | Dockerfiles, Compose, Makefile, CI | `infra/*`, `Makefile`, `.github/workflows/ci.yml` | `docker compose up` works in simulation | Playwright against `docker compose` | ✅ |
 | 12 | Docs | README, architecture, threat model, demo, deployment, ADRs | `docs/*` | No unsupported security claims | review | ✅ |
 | 13 | Real validation | Smoke test on a real Brev GPU | `scripts/real_smoke_test.py` | Timings recorded | — | ⬜ pending credentials + network |
 
@@ -50,3 +50,10 @@ Status legend: ✅ done · 🟡 implemented, real-infra validation pending · �
 Backend: fastapi, uvicorn, pydantic v2, pydantic-settings, sqlalchemy 2 (async), asyncpg, alembic, pymupdf, python-multipart, httpx (tests).
 Frontend: next, react, tailwindcss v4, @playwright/test.
 No Redis, Celery, Kafka, Kubernetes, Terraform (see ADR-003).
+
+## Outcome (end of first build session)
+
+* 146 backend tests pass (unit + PostgreSQL integration); ruff, `mypy --strict`, ESLint and `tsc` clean.
+* Playwright E2E (success, forced failure, prompt injection) passes against both local processes and the Docker Compose stack.
+* Findings fixed during validation: prompt preamble duplicated the delimiter markers; `update_fields()` could bypass the state machine; the Next.js rewrite proxy truncated uploads above 10 MB (500 instead of 202/413); `brev exec` re-runs commands that exit non-zero (health polls and inference) — replaced exit-code signalling with the `EPHEMERA_RESULT=` protocol; brev-cli v0.6.335 needs Go ≥ 1.25; `--disable-log-requests` no longer exists in vLLM v0.30.0.
+* **Not done:** Phase 13 — no real Brev GPU was provisioned (no credentials; Brev API and Hugging Face blocked by the sandbox network policy). NIM provider is a fail-fast placeholder by design (P6).
