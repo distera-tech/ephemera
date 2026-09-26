@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/* Ephemera design tokens: dark infrastructure control plane.
+   green = healthy / destroyed / completed · amber = provisioning / waiting
+   red = failure · neutral = queued */
+@theme {
+  --color-bg: #07090c;
+  --color-panel: #0d1117;
+  --color-panel-2: #121821;
+  --color-line: #1e2733;
+  --color-line-strong: #2b3746;
+  --color-fg: #e6edf3;
+  --color-muted: #8b98a8;
+  --color-dim: #5b6776;
+  --color-ok: #3fd07f;
+  --color-ok-bg: #0e2a1b;
+  --color-warn: #f2b33d;
+  --color-warn-bg: #2d220b;
+  --color-bad: #ff5c5c;
+  --color-bad-bg: #2e1012;
+  --color-info: #4fb3ff;
+  --color-accent: #76b900;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle grid backdrop, like a control plane canvas. */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(242 179 61 / 0.45); }
+  70% { box-shadow: 0 0 0 10px rgb(242 179 61 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(242 179 61 / 0); }
+}
+.pulse-warn {
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes settle {
+  from { transform: scale(0.96); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
+}
+.settle {
+  animation: settle 420ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-warn, .settle { animation: none; }
+}

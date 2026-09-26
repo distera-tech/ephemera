@@ -1,0 +1,93 @@
+# Local stack. Works in EPHEMERA_MODE=simulation with no credentials and no GPU.
+#   docker compose -f infra/docker-compose.yml --env-file .env up --build
+name: ephemera
+
+x-backend: &backend
+  build:
+    context: ..
+    dockerfile: infra/docker/api.Dockerfile
+    secrets: [extra_ca]
+  image: ephemera-api:local
+  env_file:
+    - path: ../.env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+asyncpg://ephemera:${POSTGRES_PASSWORD:-ephemera}@postgres:5432/ephemera
+    DATA_DIR: /tmp/ephemera/jobs
+    BREV_HOME: /tmp/ephemera/brev-home
+  depends_on:
+    postgres:
+      condition: service_healthy
+  volumes:
+    - jobdata:/tmp/ephemera/jobs
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ephemera
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ephemera}
+      POSTGRES_DB: ephemera
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ephemera"]
+      interval: 3s
+      retries: 20
+
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    <<: *backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.workers"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+    # SIGTERM makes the worker cancel its job and run cleanup + destroy + verify.
+    # Give real-mode teardown enough time before Docker sends SIGKILL.
+    stop_grace_period: 10m
+    volumes:
+      - jobdata:/tmp/ephemera/jobs
+      - brevhome:/tmp/ephemera/brev-home
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+      secrets: [extra_ca]
+      args:
+        API_INTERNAL_URL: http://api:8000
+    image: ephemera-web:local
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  pgdata:
+  brevhome:
+  # Job documents live in memory (tmpfs), shared by api (writes uploads) and worker.
+  jobdata:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=512m,uid=10001,gid=10001,mode=0700"
+
+secrets:
+  # Optional extra CA for builds behind a TLS-intercepting proxy; empty by default.
+  extra_ca:
+    file: ${EXTRA_CA_CERT:-/dev/null}

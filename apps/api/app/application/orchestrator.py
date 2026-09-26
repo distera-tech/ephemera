@@ -451,7 +451,11 @@ class Orchestrator:
             else:
                 await self._safe(
                     self.repo.record_event(
-                        job.id, "cleanup.remote", "Remote job directory and model container removed"
+                        job.id,
+                        "cleanup.remote",
+                        "Simulated remote cleanup complete"
+                        if self.inference.is_simulated
+                        else "Remote job directory and model container removed",
                     ),
                     "event",
                 )
