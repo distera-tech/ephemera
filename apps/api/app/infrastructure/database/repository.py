@@ -54,7 +54,8 @@ def _to_domain(row: JobRow) -> Job:
 def _serialisable(fields_: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in fields_.items():
-        if key not in _JOB_FIELDS or key in {"id", "created_at"}:
+        if key not in _JOB_FIELDS or key in {"id", "created_at", "status"}:
+            # status changes only through transition(), which validates and records an event
             raise ValueError(f"unknown or immutable job field: {key}")
         out[key] = value.value if hasattr(value, "value") else value
     return out
@@ -449,9 +450,7 @@ class PostgresJobRepository:
     async def stats(self) -> dict[str, Any]:
         async with self._sm() as s:
             by_status = dict(
-                (await s.execute(select(JobRow.status, func.count()).group_by(JobRow.status)))
-                .tuples()
-                .all()
+                (await s.execute(select(JobRow.status, func.count()).group_by(JobRow.status))).all()
             )
             active_instances = (
                 await s.execute(

@@ -323,7 +323,9 @@ class Orchestrator:
         await self.repo.transition(
             job.id,
             JobStatus.READY,
-            "Simulated model runtime ready" if self.inference.is_simulated else "Model server healthy (localhost-only endpoint)",
+            "Simulated model runtime ready"
+            if self.inference.is_simulated
+            else "Model server healthy (localhost-only endpoint)",
             fields={"model_ready_at": now()},
             metadata={"model_loading_seconds": round(time.monotonic() - load_started, 1)},
         )
