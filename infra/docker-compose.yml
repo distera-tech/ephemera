@@ -14,6 +14,7 @@ x-backend: &backend
   environment:
     DATABASE_URL: postgresql+asyncpg://ephemera:${POSTGRES_PASSWORD:-ephemera}@postgres:5432/ephemera
     DATA_DIR: /tmp/ephemera/jobs
+    WORKER_ID: ephemera-worker-1
     BREV_HOME: /tmp/ephemera/brev-home
   depends_on:
     postgres:

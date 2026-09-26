@@ -168,35 +168,44 @@ def cmd_copy(args: list[str]) -> int:
     return 0
 
 
+def ok() -> int:
+    print("EPHEMERA_RESULT=ok")
+    return 0
+
+
+def err(reason: str, message: str) -> int:
+    # Mirrors infra/gpu/bootstrap.sh: handled errors exit 0 with a result line.
+    print(f"EPHEMERA_RESULT=error:{reason}:{message}")
+    return 0
+
+
 def bootstrap(name: str, sub: str, job_dir: str) -> int:
     m = modes()
     d = remote_path(name, job_dir)
     if sub == "prepare":
         if "prepare_fail" in m:
-            print("EPHEMERA_ERROR=nvidia-smi not found (no NVIDIA driver?)", file=sys.stderr)
-            return 1
+            return err("no_gpu", "nvidia-smi not found (no NVIDIA driver?)")
         if not (d / "runtime.env").exists() or not (d / "bootstrap.sh").exists():
-            print("EPHEMERA_ERROR=runtime.env missing", file=sys.stderr)
-            return 1
+            return err("config", "runtime.env missing")
         print("EPHEMERA_GPU=NVIDIA L40S, 46068, 550.54.15")
-        return 0
+        return ok()
     if sub == "start-model":
         (d / "secrets.env").unlink(missing_ok=True)
         (STATE / "model_started").write_text("1")
-        return 0
+        return ok()
     if sub == "health":
-        return 3 if "model_crash" in m else 0
+        if "model_crash" in m:
+            return err("container_exited", "model container not running (exit code 1)")
+        return ok()
     if sub == "infer":
         req = d / "request.json"
         if not req.exists():
-            print("EPHEMERA_ERROR=request.json missing", file=sys.stderr)
-            return 1
+            return err("no_request", "request.json missing (already consumed?)")
         payload = json.loads(req.read_text())
         (STATE / "last_request_keys.json").write_text(json.dumps(sorted(payload)))
         req.unlink()
         if "infer_http_error" in m:
-            print("EPHEMERA_ERROR=inference endpoint returned HTTP 500", file=sys.stderr)
-            return 1
+            return err("http", "inference endpoint returned HTTP 500")
         content = "not json at all" if "infer_bad_json" in m else json.dumps(VALID_ANALYSIS)
         if "infer_bad_json_once" in m and not (STATE / "bad_once").exists():
             (STATE / "bad_once").write_text("1")
@@ -204,13 +213,12 @@ def bootstrap(name: str, sub: str, job_dir: str) -> int:
         (d / "response.json").write_text(
             json.dumps({"choices": [{"message": {"content": content}}]})
         )
-        return 0
+        return ok()
     if sub == "cleanup":
         if "remote_cleanup_fail" in m:
-            print("EPHEMERA_ERROR=job dir still present", file=sys.stderr)
-            return 1
+            return err("cleanup", "job dir still present")
         shutil.rmtree(d, ignore_errors=True)
-        return 0
+        return ok()
     return 2
 
 

@@ -13,6 +13,7 @@ import asyncio
 import json
 import shlex
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.core.logging import get_logger
@@ -54,11 +55,31 @@ def parse_gpu_line(stdout: str) -> BootstrapReport:
     )
 
 
-def _error_tail(result: ExecResult) -> str:
-    for line in reversed((result.stderr or "").splitlines()):
-        if line.startswith("EPHEMERA_ERROR="):
-            return line.split("=", 1)[1][:300]
-    return f"exit code {result.exit_code}"
+@dataclass(frozen=True, slots=True)
+class RemoteOutcome:
+    ok: bool
+    reason: str
+    message: str
+
+
+def parse_outcome(result: ExecResult) -> RemoteOutcome:
+    """Parse the bootstrap script's ``EPHEMERA_RESULT=`` line (see infra/gpu/bootstrap.sh).
+
+    A non-zero exit or a missing result line means the command did not complete
+    (SSH/transport failure), never a handled remote error.
+    """
+    if result.exit_code != 0:
+        return RemoteOutcome(
+            False, "transport", f"remote command did not complete (exit {result.exit_code})"
+        )
+    for line in reversed(result.stdout.splitlines()):
+        if line.startswith("EPHEMERA_RESULT="):
+            value = line.split("=", 1)[1].strip()
+            if value == "ok":
+                return RemoteOutcome(True, "ok", "")
+            _, reason, message = [*value.split(":", 2), "", ""][:3]
+            return RemoteOutcome(False, reason or "unknown", message[:300])
+    return RemoteOutcome(False, "transport", "no result line from remote command")
 
 
 class VLLMProvider:
@@ -133,9 +154,10 @@ class VLLMProvider:
             remote_command("prepare", ctx.remote_dir),
             timeout_s=max(10, deadline - time.monotonic()),
         )
-        if result.exit_code != 0:
+        outcome = parse_outcome(result)
+        if not outcome.ok:
             raise InferenceError(
-                f"environment verification failed: {_error_tail(result)}",
+                f"environment verification failed: {outcome.message}",
                 code=ErrorCode.BOOTSTRAP_FAILED,
             )
         return parse_gpu_line(result.stdout)
@@ -144,9 +166,10 @@ class VLLMProvider:
         result = await ctx.executor.execute(
             remote_command("start-model", ctx.remote_dir), timeout_s=timeout_s
         )
-        if result.exit_code != 0:
+        outcome = parse_outcome(result)
+        if not outcome.ok:
             raise InferenceError(
-                f"model server failed to start: {_error_tail(result)}",
+                f"model server failed to start: {outcome.message}",
                 code=ErrorCode.MODEL_STARTUP_FAILED,
             )
 
@@ -157,13 +180,15 @@ class VLLMProvider:
             result = await ctx.executor.execute(
                 remote_command("health", ctx.remote_dir), timeout_s=60
             )
-            if result.exit_code == 0:
+            outcome = parse_outcome(result)
+            if outcome.ok:
                 return
-            if result.exit_code == 3:
+            if outcome.reason == "container_exited":
                 raise InferenceError(
-                    "model container exited during startup (check model id, licence acceptance / HF_TOKEN, VRAM)",
+                    f"{outcome.message} (check model id, licence acceptance / HF_TOKEN, VRAM)",
                     code=ErrorCode.MODEL_STARTUP_FAILED,
                 )
+            # not_ready or a transient transport failure: keep polling until the deadline
             await asyncio.sleep(min(20.0, 3.0 * (1.5**attempt)))
             attempt += 1
         raise InferenceError(
@@ -203,13 +228,11 @@ class VLLMProvider:
         result = await ctx.executor.execute(
             remote_command("infer", ctx.remote_dir), timeout_s=timeout_s
         )
-        if result.exit_code != 0:
-            code = (
-                ErrorCode.INFERENCE_TIMEOUT
-                if "timed out" in _error_tail(result)
-                else ErrorCode.INFERENCE_FAILED
+        outcome = parse_outcome(result)
+        if not outcome.ok:
+            raise InferenceError(
+                f"inference failed: {outcome.message}", code=ErrorCode.INFERENCE_FAILED
             )
-            raise InferenceError(f"inference failed: {_error_tail(result)}", code=code)
         local = ctx.local_dir / RESPONSE_FILE
         try:
             await ctx.executor.download(
@@ -236,7 +259,8 @@ class VLLMProvider:
         result = await ctx.executor.execute(
             remote_command("cleanup", ctx.remote_dir), timeout_s=timeout_s
         )
-        if result.exit_code != 0:
+        outcome = parse_outcome(result)
+        if not outcome.ok:
             raise InferenceError(
-                f"remote cleanup failed: {_error_tail(result)}", code=ErrorCode.CLEANUP_FAILED
+                f"remote cleanup failed: {outcome.message}", code=ErrorCode.CLEANUP_FAILED
             )
