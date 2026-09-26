@@ -1,0 +1,75 @@
+[project]
+name = "ephemera-api"
+version = "0.1.0"
+description = "Ephemera — ephemeral AI inference orchestrator (API + worker)"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "fastapi>=0.141,<1",
+    "uvicorn[standard]>=0.54",
+    "pydantic>=2.13,<3",
+    "pydantic-settings>=2.15,<3",
+    "sqlalchemy[asyncio]>=2.1,<3",
+    "asyncpg>=0.31",
+    "alembic>=1.20",
+    "pymupdf>=1.28",
+    "python-multipart>=0.0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+    "httpx>=0.28",
+    "ruff>=0.16",
+    "mypy>=2.3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+markers = [
+    "integration: requires PostgreSQL (TEST_DATABASE_URL)",
+    "real_brev: requires real Brev credentials; never runs by default",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF", "SIM"]
+ignore = [
+    "S101",   # assert in tests
+    "S603",   # subprocess without shell — we always pass argument arrays
+    "S108",   # /tmp paths are intentional and job-scoped
+    "RUF012",
+    "E501",   # formatter enforces code width; long prose strings are fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B011"]
+"alembic/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/", "tests/"]
+
+[[tool.mypy.overrides]]
+module = ["app.infrastructure.documents.extract_cli"]
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = ["fitz", "pymupdf"]
+ignore_missing_imports = true
