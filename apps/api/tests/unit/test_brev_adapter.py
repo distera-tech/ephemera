@@ -26,6 +26,8 @@ def client(state: Path, **kw: object) -> BrevClient:
         "home": state / "home",
         "api_key": SecretStr("brev-secret-key-123"),
         "org": "demo-org",
+        "ssh_path": str(state / "bin" / "ssh"),
+        "scp_path": str(state / "bin" / "scp"),
     }
     args.update(kw)
     return BrevClient(**args)  # type: ignore[arg-type]
@@ -149,7 +151,7 @@ async def test_list_ignores_foreign_instances(fake_brev: Path) -> None:
 
 
 async def test_ssh_probe_timeout_is_retried_not_fatal(fake_brev: Path) -> None:
-    """Regression (real Brev run 2026-09-27): a hanging first `brev exec … true` failed the job."""
+    """Regression (real Brev run 2026-09-27): a hanging first SSH probe failed the job."""
     provider = BrevComputeProvider(client(fake_brev), ssh_probe_timeout_s=1)
     await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
     set_fake_mode(fake_brev, "probe_hang_once")
@@ -195,3 +197,35 @@ async def test_brev_setup_failure_is_structured(fake_brev: Path) -> None:
     with pytest.raises(ComputeError) as err:
         await provider.wait_until_ready(NAME, timeout_s=30)
     assert "CREATE_FAILED" in err.value.message
+
+
+async def test_first_ssh_failure_after_setup_is_retried(fake_brev: Path) -> None:
+    """Regression (real run 4): `brev exec` gave SSH 5 s per attempt and failed after setup;
+    Ephemera now runs ssh itself with a realistic ConnectTimeout and retries the probe."""
+    provider = BrevComputeProvider(client(fake_brev, ssh_connect_timeout_s=45))
+    await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
+    set_fake_mode(fake_brev, "ssh_timeout_once")
+    assert (await provider.wait_until_ready(NAME, timeout_s=60)).is_running
+    assert sum(1 for c in calls(fake_brev) if c == ["exec", "--host", NAME, "true"]) == 2
+
+
+async def test_ssh_argv_and_env(fake_brev: Path, tmp_path: Path) -> None:
+    from app.infrastructure.brev import commands
+
+    argv = commands.ssh_exec(NAME, "true", host=True, connect_timeout_s=60)
+    assert argv[-2:] == [f"{NAME}-host", "true"]
+    for opt in ("BatchMode=yes", "RequestTTY=no", "ControlMaster=no", "ConnectTimeout=60"):
+        assert opt in argv
+    c = client(fake_brev)
+    (fake_brev / "instances.json").write_text(
+        json.dumps({NAME: {"name": NAME, "status": "RUNNING"}})
+    )
+    assert (await c.exec(NAME, "true", timeout_s=30)).exit_code == 0
+    env = json.loads((fake_brev / "last_env.json").read_text())
+    # ssh needs the API key for Brev's `Match exec "brev mint-cert"`, and no fake agent socket.
+    assert env["BREV_API_KEY"] == "brev-secret-key-123" and "SSH_AUTH_SOCK" not in env
+    src = tmp_path / "f.txt"
+    src.write_text("x")
+    (fake_brev / "remote" / NAME / "tmp").mkdir(parents=True)
+    await c.copy_to(NAME, src, "/tmp/f.txt", timeout_s=30)
+    assert calls(fake_brev)[-1] == ["copy", "--host", str(src), f"{NAME}:/tmp/f.txt"]

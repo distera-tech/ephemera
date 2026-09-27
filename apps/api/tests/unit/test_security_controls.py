@@ -95,9 +95,12 @@ def test_filename_never_reaches_brev_arguments() -> None:
     name = instance_name_for(job_id)
     argv = commands.create(name, ["l40s.1x"], 300)
     assert all("pdf" not in a for a in argv)
-    assert commands.exec_(name, remote_command("infer", f"/tmp/ephemera/jobs/{job_id}"), host=True)[
-        -1
-    ] == (f"bash /tmp/ephemera/jobs/{job_id}/bootstrap.sh infer /tmp/ephemera/jobs/{job_id}")
+    assert commands.ssh_exec(
+        name,
+        remote_command("infer", f"/tmp/ephemera/jobs/{job_id}"),
+        host=True,
+        connect_timeout_s=60,
+    )[-1] == (f"bash /tmp/ephemera/jobs/{job_id}/bootstrap.sh infer /tmp/ephemera/jobs/{job_id}")
 
 
 @pytest.mark.parametrize(
@@ -107,7 +110,8 @@ def test_filename_never_reaches_brev_arguments() -> None:
 def test_brev_mutations_refuse_foreign_instances(bad: str) -> None:
     for build in (
         lambda: commands.delete(bad),
-        lambda: commands.exec_(bad, "true", host=True),
+        lambda: commands.ssh_exec(bad, "true", host=True, connect_timeout_s=60),
+        lambda: commands.scp_to(bad, "/tmp/a", "/tmp/b", host=True, connect_timeout_s=60),
         lambda: commands.create(bad, ["t"], 60),
     ):
         with pytest.raises(UnsafeInstanceNameError):
@@ -125,12 +129,16 @@ def test_no_delete_all_builder_exists() -> None:
 )
 def test_copy_rejects_unsafe_paths(path: str) -> None:
     with pytest.raises(ValueError):
-        commands.copy_to("ephemera-abcdefabcdef", path, "/tmp/ephemera/jobs/x", host=True)
+        commands.scp_to(
+            "ephemera-abcdefabcdef", path, "/tmp/ephemera/jobs/x", host=True, connect_timeout_s=60
+        )
 
 
 def test_exec_rejects_multiline_commands() -> None:
     with pytest.raises(ValueError):
-        commands.exec_("ephemera-abcdefabcdef", "true\nrm -rf /", host=True)
+        commands.ssh_exec(
+            "ephemera-abcdefabcdef", "true\nrm -rf /", host=True, connect_timeout_s=60
+        )
 
 
 def test_remote_commands_are_a_fixed_set() -> None:

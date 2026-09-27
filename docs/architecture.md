@@ -156,10 +156,14 @@ sequenceDiagram
 `bootstrap.sh` sub-commands are a fixed set (`prepare`, `start-model`, `health`, `infer`,
 `cleanup`) invoked with a UUID-derived path — never user data. Every handled outcome
 **exits 0** and prints `EPHEMERA_RESULT=ok` or `EPHEMERA_RESULT=error:<reason>:<message>`.
-A non-zero exit means only "transport failed". This is deliberate: `brev exec` (v0.6.335)
-treats any non-zero exit as an SSH failure, refreshes its SSH config and **re-runs the
-command** — which would duplicate health polls and inference. Sub-commands are also
-idempotent in case a genuine transport retry happens.
+A non-zero exit means only "transport failed" (ssh itself exits 255). Remote commands and
+file transfers run through OpenSSH `ssh`/`scp` directly, against the `<instance>-host`
+alias that `brev refresh` writes (non-interactive options, `ConnectTimeout` 60 s, no
+connection multiplexing). `brev exec`/`brev copy` (v0.6.335) are not used: they give each
+SSH attempt only 5 s — too short for Brev's cloudflared tunnel right after setup (real run
+4) — re-run a command that exits non-zero, and refresh the whole SSH config on every copy
+(~24 s). Sub-commands stay idempotent in case the orchestrator retries after a transport
+error.
 
 ## GPU selection
 

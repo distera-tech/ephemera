@@ -22,10 +22,10 @@ RUN --mount=type=secret,id=extra_ca,required=false \
  && uv sync --frozen --no-dev --no-install-project
 
 # --- Runtime -------------------------------------------------------------------------------
-# The full (non-slim) image ships openssh-client, which `brev exec` / `brev copy` shell out
-# to; this avoids an apt step (and its mirror dependency) entirely.
+# The full (non-slim) image ships openssh-client (ssh + scp), which Ephemera uses with the
+# SSH config `brev refresh` writes; this avoids an apt step (and its mirror dependency).
 FROM python:3.12-bookworm
-RUN ssh -V \
+RUN ssh -V && command -v scp \
  && useradd --uid 10001 --create-home --shell /bin/bash ephemera \
  && mkdir -p /tmp/ephemera/jobs \
  && chown -R ephemera:ephemera /tmp/ephemera

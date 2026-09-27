@@ -117,7 +117,7 @@ def workspace(tmp_path: Path):  # type: ignore[no-untyped-def]
 # ------------------------------------------------------------------------- fake brev
 @pytest.fixture
 def fake_brev(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Returns the fake CLI's state dir. The executable is at <state>/bin/brev."""
+    """Returns the fake CLI's state dir. Executables: <state>/bin/{brev,ssh,scp}."""
     state = tmp_path / "fake-brev"
     (state / "bin").mkdir(parents=True)
     exe = state / "bin" / "brev"
@@ -126,6 +126,14 @@ def fake_brev(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         f'#!/bin/sh\nFAKE_BREV_STATE={state} exec {sys.executable} {FIXTURES / "fake_brev.py"} "$@"\n'
     )
     exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    # ssh/scp to `<instance>-host` are emulated by the same fake (see to_brev_argv).
+    for tool in ("ssh", "scp"):
+        w = state / "bin" / tool
+        w.write_text(
+            f"#!/bin/sh\nFAKE_BREV_STATE={state} exec {sys.executable} "
+            f'{FIXTURES / "fake_brev.py"} __{tool} "$@"\n'
+        )
+        w.chmod(w.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("FAKE_BREV_STATE", str(state))
     return state
 

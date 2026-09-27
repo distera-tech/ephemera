@@ -29,6 +29,8 @@ def real_stack(repo, workspace, state: Path, hf_token: str | None = "hf_testtoke
         home=state / "home",
         api_key=SecretStr("brev-key-xyz"),
         org=None,
+        ssh_path=str(state / "bin" / "ssh"),
+        scp_path=str(state / "bin" / "scp"),
     )
     compute = BrevComputeProvider(client)
     inference = VLLMProvider(

@@ -73,7 +73,7 @@ class BrevComputeProvider:
         deadline = time.monotonic() + timeout_s
         attempt = 0
         info: InstanceInfo | None = None
-        refreshed = False
+        failed_probes = 0
         last_error = ""
         while time.monotonic() < deadline:
             try:
@@ -96,11 +96,11 @@ class BrevComputeProvider:
                 last_error = f"waiting for instance setup (build status {info.build_status})"
                 log.info("brev.waiting_for_setup", extra={"build_status": info.build_status})
             elif info is not None and info.is_running:
-                if not refreshed:
-                    # Make sure the `ssh <instance>` alias exists before probing.
+                if failed_probes % 3 == 0:
+                    # Write/refresh the `<instance>-host` SSH alias (and cloudflared) before
+                    # probing; redone every few failures in case the route changed after setup.
                     try:
                         await self.client.refresh_ssh_config()
-                        refreshed = True
                     except BrevError as exc:
                         last_error = f"brev refresh: {exc.message}"
                 # Brev reports RUNNING before sshd is always reachable; prove we can execute.
@@ -112,9 +112,11 @@ class BrevComputeProvider:
                     )
                     if probe.exit_code == 0:
                         return info
-                    last_error = f"ssh probe exit {probe.exit_code}"
+                    detail = probe.stderr.strip().splitlines()[-1:] or [""]
+                    last_error = f"ssh probe exit {probe.exit_code}: {detail[0][:300]}".rstrip(": ")
                 except BrevError as exc:
                     last_error = exc.message
+                failed_probes += 1
                 log.info("brev.ssh_probe_retry", extra={"attempt": attempt, "error": last_error})
             await _backoff_sleep(attempt)
             attempt += 1

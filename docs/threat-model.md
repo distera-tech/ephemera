@@ -59,13 +59,13 @@ It is not a claim of security certification or regulatory compliance.
 
 ### T5 — Path traversal
 * **Mitigations:** job directories derive only from `uuid.UUID` objects and are checked to
-  stay under the workspace root; `brev copy` paths must match `^/[A-Za-z0-9._/-]+$`
+  stay under the workspace root; `scp` paths must match `^/[A-Za-z0-9._/-]+$`
   without `..`; `bootstrap.sh` rejects any job dir not matching
   `/tmp/ephemera/jobs/<uuid>`. (`test_copy_rejects_unsafe_paths`, `test_rejects_job_dirs_outside_scheme`)
 
 ### T6 — Command injection
-* **Attack surface:** `brev exec` embeds its command in a local `bash -c` and remotely in
-  SSH.
+* **Attack surface:** the remote command is passed to `ssh` and interpreted by the
+  instance's login shell.
 * **Mitigations:** `create_subprocess_exec` with argument arrays (never `shell=True`);
   remote commands are a fixed set built from constants plus `shlex.quote`d UUID paths;
   single-line/length checks; instance names must match `ephemera-<12 hex>`; model id and

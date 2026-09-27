@@ -15,5 +15,8 @@ process-group kill, closed stdin, a sanitized environment and redacted errors;
 
 **Consequences.** CLI changes are absorbed in one place; tests run the real client
 against a fake `brev` binary with the same JSON shapes. Trade-off: we depend on the CLI's
-behaviours, e.g. `brev exec` re-running commands after a non-zero exit — handled by the
-bootstrap result-line protocol (see architecture.md).
+behaviours and SSH config format. Remote execution and copies use OpenSSH directly with
+the config `brev refresh` writes (the `<instance>-host` alias), because `brev exec`/`brev
+copy` allow only 5 s per SSH attempt and re-run failed commands; this failed on real Brev
+(run 4). The bootstrap result-line protocol (see architecture.md) keeps outcomes separate
+from transport failures.

@@ -264,9 +264,60 @@ def cmd_exec(args: list[str]) -> int:
     return 127
 
 
+def _strip_ssh_options(args: list[str]) -> list[str]:
+    rest: list[str] = []
+    i = 0
+    while i < len(args):
+        if args[i] == "-o":
+            i += 2
+            continue
+        if args[i] in ("-T", "-q"):
+            i += 1
+            continue
+        rest.append(args[i])
+        i += 1
+    return rest
+
+
+def _alias(alias: str) -> tuple[bool, str]:
+    return (True, alias[: -len("-host")]) if alias.endswith("-host") else (False, alias)
+
+
+def to_brev_argv(tool: str, args: list[str]) -> list[str]:
+    """Normalises an ssh/scp invocation (via Brev's `<name>-host` alias) to the equivalent
+    `brev exec`/`brev copy` argv, so tests can assert on one call log."""
+    if "BatchMode=yes" not in args:
+        raise SystemExit(f"fake {tool}: expected non-interactive options, got {args}")
+    rest = _strip_ssh_options(args)
+    if tool == "ssh":
+        host, name = _alias(rest[0])
+        return ["exec", *(["--host"] if host else []), name, rest[1]]
+    src, dst = rest
+    remote = src if ":" in src else dst
+    host, name = _alias(remote.split(":", 1)[0])
+    src, dst = (
+        (f"{name}:{src.split(':', 1)[1]}", dst)
+        if ":" in src
+        else (src, f"{name}:{dst.split(':', 1)[1]}")
+    )
+    return ["copy", *(["--host"] if host else []), src, dst]
+
+
 def main(argv: list[str]) -> int:
     STATE.mkdir(parents=True, exist_ok=True)
     REMOTE.mkdir(exist_ok=True)
+    if argv and argv[0] in ("__ssh", "__scp"):
+        argv = to_brev_argv(argv[0][2:], argv[1:])
+        if (
+            argv[0] == "exec"
+            and "ssh_timeout_once" in modes()
+            and not (STATE / "ssh_timed_out").exists()
+        ):
+            # Reproduces real run 4: the first connection after setup fails.
+            (STATE / "ssh_timed_out").write_text("1")
+            log_call(argv)
+            print("ssh: connect to host ... port 22: Connection timed out", file=sys.stderr)
+            return 255
     log_call(argv)
     cmd, rest = argv[0], argv[1:]
     if cmd == "search":

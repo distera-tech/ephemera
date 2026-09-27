@@ -4,8 +4,14 @@ Pure functions, unit-tested, and the only place CLI syntax lives. Every
 builder returns a list passed to ``create_subprocess_exec`` (never a shell).
 Instance names are validated against Ephemera's naming scheme so a bug can
 never target a non-Ephemera instance; paths are validated against a strict
-character set because ``brev copy`` parses ``instance:path`` and ``brev exec``
-embeds its command in a local ``bash -c``.
+character set because ``scp`` parses ``alias:path`` and the remote command is run
+by the instance's login shell.
+
+Remote execution and file transfer use OpenSSH (``ssh``/``scp``) directly with the
+config ``brev refresh`` writes, not ``brev exec``/``brev copy``: those give each SSH
+connection attempt 5 s (20 tries), re-run a failed command, and refresh the whole
+SSH config on every copy. Over Brev's cloudflared tunnel a first connection after
+setup can take longer than 5 s, which made every ``brev exec`` fail.
 """
 
 from __future__ import annotations
@@ -77,29 +83,63 @@ def list_json() -> list[str]:
     return ["ls", "--json"]
 
 
-def exec_(name: str, command: str, *, host: bool) -> list[str]:
+# Options that override Brev's generated host entry where it does not suit a
+# non-interactive orchestrator. `-o` values take precedence over the config file.
+_SSH_OPTIONS = (
+    "BatchMode=yes",  # never prompt
+    "StrictHostKeyChecking=no",  # fresh, per-job instance; Brev's own config does the same
+    "UserKnownHostsFile=/dev/null",
+    "ServerAliveInterval=15",
+    "ServerAliveCountMax=4",
+    "LogLevel=ERROR",
+    "RemoteCommand=none",
+    "RequestTTY=no",  # Brev sets `RequestTTY yes`
+    "ForwardAgent=no",  # Brev sets `ForwardAgent yes`
+    "ControlMaster=no",  # no background master process outliving the call
+    "ControlPath=none",
+)
+
+
+def ssh_alias(name: str, *, host: bool) -> str:
+    """The `Host` alias `brev refresh` writes: ``<name>`` (container) or ``<name>-host`` (VM)."""
     require_ephemera_name(name)
+    return f"{name}-host" if host else name
+
+
+def _ssh_options(connect_timeout_s: int) -> list[str]:
+    opts: list[str] = []
+    for o in (*_SSH_OPTIONS, f"ConnectTimeout={max(1, int(connect_timeout_s))}"):
+        opts += ["-o", o]
+    return opts
+
+
+def ssh_exec(name: str, command: str, *, host: bool, connect_timeout_s: int) -> list[str]:
+    """Arguments for ``ssh``: run one fixed, single-line command on the instance."""
     if "\n" in command or "\x00" in command or len(command) > 4096:
         raise ValueError("remote command must be a single short line")
-    return ["exec", *(["--host"] if host else []), name, command]
+    return ["-T", *_ssh_options(connect_timeout_s), ssh_alias(name, host=host), command]
 
 
-def copy_to(name: str, local_path: str, remote_path: str, *, host: bool) -> list[str]:
-    require_ephemera_name(name)
+def scp_to(
+    name: str, local_path: str, remote_path: str, *, host: bool, connect_timeout_s: int
+) -> list[str]:
+    alias = ssh_alias(name, host=host)
     return [
-        "copy",
-        *(["--host"] if host else []),
+        "-q",
+        *_ssh_options(connect_timeout_s),
         _require_path(local_path),
-        f"{name}:{_require_path(remote_path)}",
+        f"{alias}:{_require_path(remote_path)}",
     ]
 
 
-def copy_from(name: str, remote_path: str, local_path: str, *, host: bool) -> list[str]:
-    require_ephemera_name(name)
+def scp_from(
+    name: str, remote_path: str, local_path: str, *, host: bool, connect_timeout_s: int
+) -> list[str]:
+    alias = ssh_alias(name, host=host)
     return [
-        "copy",
-        *(["--host"] if host else []),
-        f"{name}:{_require_path(remote_path)}",
+        "-q",
+        *_ssh_options(connect_timeout_s),
+        f"{alias}:{_require_path(remote_path)}",
         _require_path(local_path),
     ]
 

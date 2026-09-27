@@ -1,8 +1,11 @@
-"""BrevClient — the single gateway to the Brev CLI.
+"""BrevClient — the single gateway to the Brev CLI and to the instances' SSH.
 
+* ``brev`` for search/create/ls/refresh/delete; OpenSSH ``ssh``/``scp`` with the
+  config ``brev refresh`` writes for remote commands and file transfer (see
+  ``commands`` for why not ``brev exec``/``brev copy``);
 * argument arrays only (``create_subprocess_exec``), never ``shell=True``;
 * explicit timeout on every call; on timeout the whole process group is killed
-  (``brev exec``/``copy`` spawn ``bash``/``ssh`` children);
+  (``ssh`` spawns Brev's ``cloudflared`` proxy and ``brev mint-cert``);
 * sanitized environment: only PATH, an isolated HOME, proxy settings and the
   Brev credentials — the worker's other environment (e.g. ``HF_TOKEN``,
   ``DATABASE_URL``) is not inherited;
@@ -68,6 +71,7 @@ class CommandResult:
     stdout: str
     stderr: str
     duration_ms: int
+    label: str = ""
 
 
 def _parse_json(stdout: str) -> Any:
@@ -93,43 +97,64 @@ class BrevClient:
         api_key: SecretStr | None,
         org: str | None,
         exec_on_host: bool = True,
+        ssh_path: str = "ssh",
+        scp_path: str = "scp",
+        ssh_connect_timeout_s: int = 60,
     ) -> None:
         self.cli_path = cli_path
         self.home = home
         self._api_key = api_key
         self.org = org
         self.exec_on_host = exec_on_host
+        self.ssh_path = ssh_path
+        self.scp_path = scp_path
+        self.ssh_connect_timeout_s = ssh_connect_timeout_s
         self._org_set = False
         self._org_lock = asyncio.Lock()
 
     # ------------------------------------------------------------------ plumbing
-    def _env(self) -> dict[str, str]:
+    def _env(self, *, for_ssh: bool = False) -> dict[str, str]:
         env = {k: v for k in _PASSTHROUGH_ENV if (v := os.environ.get(k))}
         env.setdefault("PATH", "/usr/local/bin:/usr/bin:/bin")
         env["HOME"] = str(self.home)
-        # `brev exec` starts a daemonised ssh-agent whenever SSH_AUTH_SOCK is empty, leaking one
-        # agent per call. Brev's ssh config uses IdentityFile, so no agent is needed.
-        env["SSH_AUTH_SOCK"] = "/dev/null"
+        if not for_ssh:
+            # The CLI starts a daemonised ssh-agent whenever SSH_AUTH_SOCK is empty, leaking one
+            # agent per call. Brev's ssh config uses IdentityFile, so no agent is needed.
+            env["SSH_AUTH_SOCK"] = "/dev/null"
+        # ssh also needs the API key: Brev's config may run `brev mint-cert` via `Match exec`.
         env["BREV_NO_ANALYTICS"] = "1"
         env["DO_NOT_TRACK"] = "1"
         if self._api_key is not None:
             env["BREV_API_KEY"] = self._api_key.get_secret_value()
         return env
 
-    async def run(self, args: list[str], *, timeout_s: float, check: bool = True) -> CommandResult:
+    async def run(
+        self,
+        args: list[str],
+        *,
+        timeout_s: float,
+        check: bool = True,
+        binary: str | None = None,
+        label: str | None = None,
+    ) -> CommandResult:
+        """Run ``brev <args>`` (or ``binary <args>``, e.g. ssh/scp) with the sanitized env."""
         self.home.mkdir(parents=True, exist_ok=True, mode=0o700)
+        exe = binary or self.cli_path
+        label = label or args[0]
         started = time.monotonic()
         try:
             proc = await asyncio.create_subprocess_exec(
-                self.cli_path,
+                exe,
                 *args,
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=self._env(),
+                env=self._env(for_ssh=binary is not None),
                 start_new_session=True,  # own process group → killable as a unit
             )
         except FileNotFoundError:
+            if binary is not None:
+                raise BrevCLINotFoundError(f"{exe!r} not found; install openssh-client") from None
             raise BrevCLINotFoundError(
                 f"Brev CLI not found at {self.cli_path!r}; install it or set BREV_CLI_PATH"
             ) from None
@@ -143,7 +168,7 @@ class BrevClient:
             log.warning(
                 "brev.command_aborted",
                 extra={
-                    "subcommand": args[0],
+                    "subcommand": label,
                     "reason": "cancelled" if isinstance(exc, asyncio.CancelledError) else "timeout",
                     "duration_ms": int((time.monotonic() - started) * 1000),
                 },
@@ -151,7 +176,7 @@ class BrevClient:
             if isinstance(exc, asyncio.CancelledError):
                 raise
             raise BrevTimeoutError(
-                f"brev {args[0]} timed out after {timeout_s:.0f}s", timeout_s=timeout_s
+                f"brev {label} timed out after {timeout_s:.0f}s", timeout_s=timeout_s
             ) from None
         duration_ms = int((time.monotonic() - started) * 1000)
         result = CommandResult(
@@ -160,11 +185,12 @@ class BrevClient:
             stdout=out_b.decode(errors="replace"),
             stderr=err_b.decode(errors="replace"),
             duration_ms=duration_ms,
+            label=label,
         )
         log.info(
             "brev.command",
             extra={
-                "subcommand": args[0],
+                "subcommand": label,
                 "exit_code": result.exit_code,
                 "duration_ms": duration_ms,
             },
@@ -180,7 +206,7 @@ class BrevClient:
         if any(h in lowered for h in _AUTH_HINTS):
             return BrevAuthError(f"brev authentication failed: {tail}")
         return BrevCommandError(
-            f"brev {result.args[0]} exited with {result.exit_code}: {tail}",
+            f"brev {result.label or result.args[0]} exited with {result.exit_code}: {tail}",
             exit_code=result.exit_code,
             stderr_tail=tail,
         )
@@ -236,9 +262,19 @@ class BrevClient:
         await self.ensure_org()
         await self.run(commands.refresh(), timeout_s=timeout_s)
 
+    def _connect_timeout(self, timeout_s: float) -> int:
+        return int(max(5, min(self.ssh_connect_timeout_s, timeout_s - 1)))
+
     async def exec(self, name: str, command: str, timeout_s: float) -> ExecResult:
+        """Run one command over SSH. Exit 255 means ssh itself failed (transport)."""
+        args = commands.ssh_exec(
+            name,
+            command,
+            host=self.exec_on_host,
+            connect_timeout_s=self._connect_timeout(timeout_s),
+        )
         result = await self.run(
-            commands.exec_(name, command, host=self.exec_on_host), timeout_s=timeout_s, check=False
+            args, timeout_s=timeout_s, check=False, binary=self.ssh_path, label="exec"
         )
         return ExecResult(
             exit_code=result.exit_code,
@@ -250,18 +286,26 @@ class BrevClient:
     async def copy_to(
         self, name: str, local_path: Path, remote_path: str, timeout_s: float
     ) -> None:
-        await self.run(
-            commands.copy_to(name, str(local_path), remote_path, host=self.exec_on_host),
-            timeout_s=timeout_s,
+        args = commands.scp_to(
+            name,
+            str(local_path),
+            remote_path,
+            host=self.exec_on_host,
+            connect_timeout_s=self._connect_timeout(timeout_s),
         )
+        await self.run(args, timeout_s=timeout_s, binary=self.scp_path, label="copy")
 
     async def copy_from(
         self, name: str, remote_path: str, local_path: Path, timeout_s: float
     ) -> None:
-        await self.run(
-            commands.copy_from(name, remote_path, str(local_path), host=self.exec_on_host),
-            timeout_s=timeout_s,
+        args = commands.scp_from(
+            name,
+            remote_path,
+            str(local_path),
+            host=self.exec_on_host,
+            connect_timeout_s=self._connect_timeout(timeout_s),
         )
+        await self.run(args, timeout_s=timeout_s, binary=self.scp_path, label="copy")
 
     async def delete(self, name: str, timeout_s: float) -> bool:
         """Request deletion. Returns False if the instance was already absent."""

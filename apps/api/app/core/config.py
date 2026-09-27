@@ -46,10 +46,13 @@ class Settings(BaseSettings):
     brev_cli_path: str = "brev"
     # HOME given to the Brev CLI. It MUST be the OS user's home directory: Brev writes its
     # SSH config to $HOME/.ssh/config, but OpenSSH reads ~/.ssh/config from the passwd entry
-    # and ignores $HOME, so any other value makes `brev exec`/`brev copy` hang.
+    # and ignores $HOME, so any other value makes ssh/scp to the instance fail.
     # Run the worker as a dedicated OS user to keep Brev's files isolated.
     brev_home: Path = Field(default_factory=lambda: Path(pwd.getpwuid(os.getuid()).pw_dir))
     brev_exec_on_host: bool = True
+    # Per-attempt SSH connect budget. Over Brev's cloudflared tunnel the first connection
+    # after setup can take well over the 5 s `brev exec` allows.
+    brev_ssh_connect_timeout_seconds: int = Field(default=60, ge=5, le=600)
     brev_allow_cli_login: bool = False
     brev_instance_types: str = ""  # explicit override, comma separated, tried in order
     brev_create_timeout_seconds: int = 600

@@ -29,7 +29,7 @@ Without Docker: PostgreSQL 16 on localhost, then `make install migrate`, and `ma
      without it (or `BREV_ALLOW_CLI_LOGIN=true` after `brev login` as the worker's OS user).
    * Do not point `BREV_HOME` anywhere other than the OS user's home directory: Brev writes its
      SSH config to `$HOME/.ssh/config`, but OpenSSH reads the passwd home and ignores `$HOME`,
-     so `brev exec` would hang. Real mode refuses to start if they differ.
+     so ssh/scp to the instance would fail. Real mode refuses to start if they differ.
    * `BREV_ORG` — optional; the worker runs `brev set <org>` once.
    * `HF_TOKEN` — needed for gated models such as `meta-llama/Llama-3.1-8B-Instruct`.
      Accept the model licence on Hugging Face first and use a **read-only** token.
@@ -46,9 +46,11 @@ Without Docker: PostgreSQL 16 on localhost, then `make install migrate`, and `ma
 4. **Image assumptions**: Brev VM-mode instances with NVIDIA driver, Docker and the NVIDIA
    container runtime. `bootstrap.sh prepare` verifies all three and fails the job
    (`BOOTSTRAP_FAILED`, GPU destroyed) otherwise. Docker commands run on the host
-   (`brev exec --host`, `BREV_EXEC_ON_HOST=true`).
+   over `ssh <instance>-host` (`BREV_EXEC_ON_HOST=true`), using the SSH config written by
+   `brev refresh`; `BREV_SSH_CONNECT_TIMEOUT_SECONDS` (default 60) bounds each connection.
 5. **Timeouts**: first runs pull the vLLM image (several GB) and the model weights (~16 GB for an 8B bf16 model) onto
-   a fresh instance. Defaults: provisioning 600 s, model ready 900 s, job 1800 s.
+   a fresh instance. Defaults: provisioning 1200 s (create + Brev setup + SSH), bootstrap
+   600 s, model ready 1500 s, job 3600 s.
    Measure with the smoke test and adjust.
 6. **Start**: set `EPHEMERA_MODE=real` and `make up`. The UI shows "Real mode · Brev".
 
@@ -72,6 +74,7 @@ Record the output in this file when done:
 |---|---|---|---|---|---|---|---|
 | 2026-09-27 | L40S (real Brev) | `brev create` 190–195 s | — | — | delete + verify absent ≈ 35–45 s | ≈ 5 min | **Partial.** Provisioning, deletion and verification of absence confirmed on real Brev (2 jobs, both `FAILED` → GPU `DESTROYED`, COMPUTE = 0). Bootstrap never started: `brev exec` could not resolve the instance because `BREV_HOME` ≠ OS home (OpenSSH ignores `$HOME`); the SSH probe was also not retried. Both fixed; re-run pending. |
 | 2026-09-27 (run 3) | L40S (real Brev) | `brev create` 173 s | — | — | — | — | **Further.** SSH fix confirmed: `brev refresh` + `brev exec` OK, job reached BOOTSTRAPPING, remote mkdir and 2 uploads OK (each `brev copy` ≈ 24 s because it refreshes SSH config). A remote step then hung until the 300 s bootstrap timeout. Likely cause: Brev reports RUNNING before its instance setup (`build_status`) is COMPLETED. Fixed: wait for build COMPLETED, timeouts inside `bootstrap.sh`, per-step logging, larger time budgets. |
+| 2026-09-27 (run 4) | L40S (real Brev) | `brev create` ≈ 3–3.5 min, then Brev setup until build COMPLETED | — | — | delete + verify absent ≈ 35–70 s | — | **Further.** Build-status wait confirmed. The SSH probe `brev exec … true` then failed after exactly ≈ 103 s (exit 1) — Brev's own SSH wait, 20 × 5 s attempts — and the job hit `PROVISIONING_TIMEOUT`; GPU destroyed. Fixed: `ssh`/`scp` are now called directly with Brev's SSH config and a 60 s connect timeout; `brev refresh` is repeated every 3 failed probes. |
 
 ## Operating notes
 
