@@ -140,6 +140,14 @@ class BrevClient:
                 os.killpg(proc.pid, signal.SIGKILL)
             with contextlib.suppress(Exception):
                 await asyncio.wait_for(proc.wait(), timeout=5)
+            log.warning(
+                "brev.command_aborted",
+                extra={
+                    "subcommand": args[0],
+                    "reason": "cancelled" if isinstance(exc, asyncio.CancelledError) else "timeout",
+                    "duration_ms": int((time.monotonic() - started) * 1000),
+                },
+            )
             if isinstance(exc, asyncio.CancelledError):
                 raise
             raise BrevTimeoutError(

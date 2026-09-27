@@ -85,7 +85,17 @@ class BrevComputeProvider:
                 raise ComputeError(
                     f"instance entered status {info.status}", code=ErrorCode.PROVISIONING_FAILED
                 )
-            if info is not None and info.is_running:
+            if info is not None and info.is_setup_failed:
+                raise ComputeError(
+                    "Brev instance setup failed (build status CREATE_FAILED)",
+                    code=ErrorCode.PROVISIONING_FAILED,
+                )
+            if info is not None and info.is_running and not info.is_setup_complete:
+                # RUNNING is reported before Brev finishes setting the machine up (Docker,
+                # NVIDIA runtime). Brev's own tooling waits for build COMPLETED; so do we.
+                last_error = f"waiting for instance setup (build status {info.build_status})"
+                log.info("brev.waiting_for_setup", extra={"build_status": info.build_status})
+            elif info is not None and info.is_running:
                 if not refreshed:
                     # Make sure the `ssh <instance>` alias exists before probing.
                     try:

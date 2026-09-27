@@ -108,6 +108,7 @@ class VLLMProvider:
     # ------------------------------------------------------------------ lifecycle
     async def bootstrap(self, ctx: RuntimeContext, timeout_s: float) -> BootstrapReport:
         deadline = time.monotonic() + timeout_s
+        log.info("remote.step", extra={"step": "mkdir"})
         mk = await ctx.executor.execute(
             f"mkdir -p -m 700 {shlex.quote(ctx.remote_dir)}", timeout_s=min(120, timeout_s)
         )
@@ -141,6 +142,7 @@ class VLLMProvider:
             uploads.append((secrets_env, "secrets.env"))
         try:
             for local, remote_name in uploads:
+                log.info("remote.step", extra={"step": f"upload {remote_name}"})
                 await ctx.executor.upload(
                     local,
                     f"{ctx.remote_dir}/{remote_name}",
@@ -150,6 +152,7 @@ class VLLMProvider:
             if secrets_env is not None:
                 secrets_env.unlink(missing_ok=True)
 
+        log.info("remote.step", extra={"step": "prepare"})
         result = await ctx.executor.execute(
             remote_command("prepare", ctx.remote_dir),
             timeout_s=max(10, deadline - time.monotonic()),
@@ -163,6 +166,7 @@ class VLLMProvider:
         return parse_gpu_line(result.stdout)
 
     async def start(self, ctx: RuntimeContext, timeout_s: float) -> None:
+        log.info("remote.step", extra={"step": "start-model"})
         result = await ctx.executor.execute(
             remote_command("start-model", ctx.remote_dir), timeout_s=timeout_s
         )
@@ -225,6 +229,7 @@ class VLLMProvider:
             local.unlink(missing_ok=True)
 
     async def infer(self, ctx: RuntimeContext, timeout_s: float) -> str:
+        log.info("remote.step", extra={"step": "infer"})
         result = await ctx.executor.execute(
             remote_command("infer", ctx.remote_dir), timeout_s=timeout_s
         )
@@ -256,6 +261,7 @@ class VLLMProvider:
         return content
 
     async def cleanup(self, ctx: RuntimeContext, timeout_s: float) -> None:
+        log.info("remote.step", extra={"step": "cleanup"})
         result = await ctx.executor.execute(
             remote_command("cleanup", ctx.remote_dir), timeout_s=timeout_s
         )

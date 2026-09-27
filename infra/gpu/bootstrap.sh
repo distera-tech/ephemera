@@ -40,20 +40,36 @@ load_runtime_env() {
     "${SERVED_MODEL_NAME:?}" "${PORT:?}"
 }
 
+# Decide once (with bounded probes) whether docker needs sudo. A bare `docker info` can hang
+# while the instance is still being set up, so every probe has a timeout.
+DOCKER=()
+detect_docker() {
+  if [[ ${#DOCKER[@]} -gt 0 ]]; then return 0; fi
+  if timeout 20 docker info >/dev/null 2>&1; then DOCKER=(docker); return 0; fi
+  if timeout 20 sudo -n docker info >/dev/null 2>&1; then DOCKER=(sudo -n docker); return 0; fi
+  return 1
+}
 docker_cmd() {
-  if docker info >/dev/null 2>&1; then docker "$@"; else sudo -n docker "$@"; fi
+  detect_docker || die no_docker "docker daemon not reachable"
+  "${DOCKER[@]}" "$@"
 }
 
 cmd_prepare() {
   mkdir -p -m 700 "$JOB_DIR"
   command -v nvidia-smi >/dev/null || die no_gpu "nvidia-smi not found (no NVIDIA driver?)"
   local gpu
-  gpu="$(nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits | head -n1)" \
-    || die no_gpu "nvidia-smi failed"
+  gpu="$(timeout 90 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits | head -n1)" \
+    || die no_gpu "nvidia-smi failed or timed out"
   [[ -n "$gpu" ]] || die no_gpu "no NVIDIA GPU visible"
   command -v docker >/dev/null || die no_docker "docker not installed"
-  docker_cmd info >/dev/null 2>&1 || die no_docker "docker daemon not reachable"
-  if ! docker_cmd info --format '{{json .Runtimes}}' 2>/dev/null | grep -qi nvidia \
+  # The daemon may still be (re)starting right after instance setup: wait up to ~3 min.
+  local tries=0
+  until detect_docker; do
+    tries=$((tries + 1))
+    [[ $tries -ge ${EPHEMERA_DOCKER_WAIT_TRIES:-9} ]] && die no_docker "docker daemon not reachable after waiting"
+    sleep "${EPHEMERA_DOCKER_WAIT_SLEEP:-20}"
+  done
+  if ! timeout 20 "${DOCKER[@]}" info --format '{{json .Runtimes}}' 2>/dev/null | grep -qi nvidia \
      && ! command -v nvidia-container-toolkit >/dev/null && ! command -v nvidia-ctk >/dev/null; then
     die no_runtime "NVIDIA container runtime not available"
   fi

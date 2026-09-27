@@ -149,3 +149,16 @@ def test_unknown_subcommand(env) -> None:  # type: ignore[no-untyped-def]
 def test_transport_failure_is_distinguished() -> None:
     assert parse_outcome(ExecResult(255, "", "ssh: connect refused", 0)).reason == "transport"
     assert parse_outcome(ExecResult(0, "garbage", "", 0)).reason == "transport"
+
+
+def test_prepare_reports_unreachable_docker_instead_of_hanging(env) -> None:  # type: ignore[no-untyped-def]
+    job_dir, base, _ = env
+    bindir = Path(base["PATH"].split(":")[0])
+    (bindir / "docker").write_text("#!/bin/sh\nexit 1\n")
+    (bindir / "sudo").write_text("#!/bin/sh\nexit 1\n")
+    (bindir / "sudo").chmod(0o755)
+    r = run(
+        "prepare", job_dir, base, EPHEMERA_DOCKER_WAIT_TRIES="1", EPHEMERA_DOCKER_WAIT_SLEEP="0"
+    )
+    outcome = parse_outcome(r)
+    assert r.exit_code == 0 and not outcome.ok and outcome.reason == "no_docker"

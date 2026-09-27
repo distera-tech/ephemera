@@ -71,6 +71,7 @@ Record the output in this file when done:
 | Date | GPU / type | Provisioning | Model loading | Inference | Destruction | GPU runtime | Result |
 |---|---|---|---|---|---|---|---|
 | 2026-09-27 | L40S (real Brev) | `brev create` 190–195 s | — | — | delete + verify absent ≈ 35–45 s | ≈ 5 min | **Partial.** Provisioning, deletion and verification of absence confirmed on real Brev (2 jobs, both `FAILED` → GPU `DESTROYED`, COMPUTE = 0). Bootstrap never started: `brev exec` could not resolve the instance because `BREV_HOME` ≠ OS home (OpenSSH ignores `$HOME`); the SSH probe was also not retried. Both fixed; re-run pending. |
+| 2026-09-27 (run 3) | L40S (real Brev) | `brev create` 173 s | — | — | — | — | **Further.** SSH fix confirmed: `brev refresh` + `brev exec` OK, job reached BOOTSTRAPPING, remote mkdir and 2 uploads OK (each `brev copy` ≈ 24 s because it refreshes SSH config). A remote step then hung until the 300 s bootstrap timeout. Likely cause: Brev reports RUNNING before its instance setup (`build_status`) is COMPLETED. Fixed: wait for build COMPLETED, timeouts inside `bootstrap.sh`, per-step logging, larger time budgets. |
 
 ## Operating notes
 

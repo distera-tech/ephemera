@@ -173,3 +173,25 @@ def test_real_mode_rejects_brev_home_that_ssh_cannot_see(tmp_path: Path) -> None
     assert any("BREV_HOME" in p for p in bad.configuration_problems())
     good = Settings(ephemera_mode="real", brev_api_key="bak-x", _env_file=None)  # type: ignore[call-arg]
     assert not any("BREV_HOME" in p for p in good.configuration_problems())
+
+
+async def test_waits_for_brev_setup_before_probing(fake_brev: Path) -> None:
+    """Regression (real run 2026-09-27): bootstrap started while Brev was still setting up."""
+    provider = BrevComputeProvider(client(fake_brev))
+    await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
+    set_fake_mode(fake_brev, "build_pending")
+    (fake_brev / "calls.log").write_text("")
+    info = await provider.wait_until_ready(NAME, timeout_s=60)
+    assert info.is_setup_complete
+    argv = calls(fake_brev)
+    first_exec = next(i for i, c in enumerate(argv) if c[0] == "exec")
+    assert sum(1 for c in argv[:first_exec] if c[0] == "ls") >= 3  # 2x BUILDING, then COMPLETED
+
+
+async def test_brev_setup_failure_is_structured(fake_brev: Path) -> None:
+    provider = BrevComputeProvider(client(fake_brev))
+    await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
+    set_fake_mode(fake_brev, "build_failed")
+    with pytest.raises(ComputeError) as err:
+        await provider.wait_until_ready(NAME, timeout_s=30)
+    assert "CREATE_FAILED" in err.value.message

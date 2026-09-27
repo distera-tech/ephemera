@@ -59,6 +59,7 @@ class BrevWorkspace(BaseModel):
             instance_type=self.instance_type or None,
             gpu_name=self.gpu if self.gpu and self.gpu != "-" else None,
             shell_ready=self.shell_status.upper() == "READY",
+            build_status=self.build_status or None,
         )
 
 

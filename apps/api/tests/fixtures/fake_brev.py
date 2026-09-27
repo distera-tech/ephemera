@@ -131,6 +131,21 @@ def cmd_create(args: list[str]) -> int:
 
 
 def cmd_ls(args: list[str]) -> int:
+    m = modes()
+    data = load()
+    if "build_pending" in m or "build_failed" in m:
+        counter = STATE / "ls_count"
+        n = int(counter.read_text()) if counter.exists() else 0
+        counter.write_text(str(n + 1))
+        for ws in data.values():
+            if "build_failed" in m:
+                ws["build_status"] = "CREATE_FAILED"
+            elif n < 2:  # real Brev: RUNNING while setup is still BUILDING
+                ws["build_status"] = "BUILDING"
+            else:
+                ws["build_status"] = "COMPLETED"
+        print(json.dumps({"workspaces": list(data.values())}, indent=2))
+        return 0
     print(json.dumps({"workspaces": list(load().values())}, indent=2))
     return 0
 

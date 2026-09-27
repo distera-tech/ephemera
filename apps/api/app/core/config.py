@@ -73,9 +73,11 @@ class Settings(BaseSettings):
     max_output_tokens: int = 1500
 
     # --- Safety limits --------------------------------------------------------------------
-    max_job_runtime_seconds: int = 1800
-    max_provisioning_seconds: int = 600
-    bootstrap_timeout_seconds: int = 300
+    # Calibrated on real Brev L40S runs: create ~3 min, instance setup a few more minutes,
+    # each `brev copy` ~25 s (it refreshes SSH config), then image + weights download.
+    max_job_runtime_seconds: int = 2700
+    max_provisioning_seconds: int = 1200
+    bootstrap_timeout_seconds: int = 600
     model_ready_timeout_seconds: int = 900
     transfer_timeout_seconds: int = 120
     inference_timeout_seconds: int = 240

@@ -80,6 +80,16 @@ class InstanceInfo:
     instance_type: str | None = None
     gpu_name: str | None = None
     shell_ready: bool = False
+    # Provider setup after boot (Brev "verb build"): "", PENDING, BUILDING, COMPLETED, CREATE_FAILED.
+    build_status: str | None = None
+
+    @property
+    def is_setup_complete(self) -> bool:
+        return (self.build_status or "").upper() in ("", "COMPLETED")
+
+    @property
+    def is_setup_failed(self) -> bool:
+        return (self.build_status or "").upper() == "CREATE_FAILED"
 
     @property
     def is_running(self) -> bool:
