@@ -165,6 +165,16 @@ SSH attempt only 5 s — too short for Brev's cloudflared tunnel right after set
 (~24 s). Sub-commands stay idempotent in case the orchestrator retries after a transport
 error.
 
+### Unreachable provider fallback
+
+If Brev reports setup COMPLETED but the instance's SSH endpoint stays unreachable at the TCP
+level for `BREV_SSH_UNREACHABLE_TIMEOUT_SECONDS` (seen on real Brev with one provider while
+outbound ports were open), the Brev adapter deletes the instance, **waits until `brev ls`
+confirms it is gone**, and re-creates it under the same `ephemera-*` name with the remaining
+candidates from other providers (at most twice, only if the provisioning budget still allows
+a full create). A job therefore never owns more than one instance at a time, and the normal
+teardown destroys whichever instance exists at the end.
+
 ## GPU selection
 
 `app/application/gpu_selection.py` ranks the provider's live catalogue:

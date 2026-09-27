@@ -54,7 +54,9 @@ class Settings(BaseSettings):
     # after setup can take well over the 5 s `brev exec` allows.
     brev_ssh_connect_timeout_seconds: int = Field(default=60, ge=5, le=600)
     # Stop (and destroy the GPU) once SSH has been unreachable at the TCP level this long.
-    brev_ssh_unreachable_timeout_seconds: int = Field(default=420, ge=60, le=3600)
+    # Then the instance is destroyed and re-created on another provider (at most twice).
+    brev_ssh_unreachable_timeout_seconds: int = Field(default=300, ge=60, le=3600)
+    brev_excluded_providers: str = ""  # comma separated `cloud`/`provider` names to skip
     brev_allow_cli_login: bool = False
     brev_instance_types: str = ""  # explicit override, comma separated, tried in order
     brev_create_timeout_seconds: int = 600
@@ -83,8 +85,8 @@ class Settings(BaseSettings):
     # --- Safety limits --------------------------------------------------------------------
     # Calibrated on real Brev L40S runs: create ~3 min, instance setup a few more minutes,
     # each `brev copy` ~25 s (it refreshes SSH config), then image + weights download.
-    max_job_runtime_seconds: int = 3600
-    max_provisioning_seconds: int = 1200
+    max_job_runtime_seconds: int = 5400
+    max_provisioning_seconds: int = 2100
     bootstrap_timeout_seconds: int = 600
     model_ready_timeout_seconds: int = 1500
     transfer_timeout_seconds: int = 120

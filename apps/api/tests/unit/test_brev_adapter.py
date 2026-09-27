@@ -233,10 +233,37 @@ async def test_ssh_argv_and_env(fake_brev: Path, tmp_path: Path) -> None:
 
 async def test_persistently_unreachable_ssh_fails_fast(fake_brev: Path) -> None:
     """Real run 5: TCP to the instance's SSH port timed out for 15 min; stop early instead."""
-    provider = BrevComputeProvider(client(fake_brev), ssh_unreachable_timeout_s=0.5)
+    provider = BrevComputeProvider(
+        client(fake_brev), ssh_unreachable_timeout_s=0.5, max_provider_switches=0
+    )
     await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
     set_fake_mode(fake_brev, "ssh_unreachable")
     with pytest.raises(ComputeError) as err:
         await provider.wait_until_ready(NAME, timeout_s=60)
     assert err.value.code is ErrorCode.PROVISIONING_FAILED
     assert "203.0.113.7 port 44689" in err.value.message and "net-check" in err.value.message
+
+
+async def test_unreachable_provider_is_replaced_by_another(fake_brev: Path) -> None:
+    """Real run 5: network fine, but one provider's SSH port never answered. Ephemera destroys
+    that instance and re-creates it on the next candidate from a different provider."""
+    provider = BrevComputeProvider(
+        client(fake_brev), ssh_unreachable_timeout_s=0.5, min_time_for_new_instance_s=1
+    )
+    selection = await provider.select_gpu(REQ)
+    assert [c.instance_type for c in selection.candidates] == ["l40s.1x", "a100.1x"]
+    assert (await provider.provision(NAME, selection, timeout_s=60)).instance_type == "l40s.1x"
+    set_fake_mode(fake_brev, "ssh_unreachable_l40s")
+    info = await provider.wait_until_ready(NAME, timeout_s=120)
+    assert info.instance_type == "a100.1x"
+    argv = calls(fake_brev)
+    creates = [c for c in argv if c[0] == "create"]
+    assert creates[-1][creates[-1].index("--type") + 1] == "a100.1x"  # hyperstack excluded
+    assert argv.index(["delete", NAME]) < argv.index(creates[-1])
+    assert [i.name for i in await provider.list_instances()] == [NAME]  # exactly one instance
+
+
+async def test_excluded_providers_are_never_selected(fake_brev: Path) -> None:
+    provider = BrevComputeProvider(client(fake_brev), excluded_providers=("Hyperstack",))
+    selection = await provider.select_gpu(REQ)
+    assert [c.instance_type for c in selection.candidates] == ["a100.1x"]

@@ -37,7 +37,9 @@ def build_compute(settings: Settings) -> ComputeProvider:
         ssh_connect_timeout_s=settings.brev_ssh_connect_timeout_seconds,
     )
     return BrevComputeProvider(
-        client, ssh_unreachable_timeout_s=settings.brev_ssh_unreachable_timeout_seconds
+        client,
+        ssh_unreachable_timeout_s=settings.brev_ssh_unreachable_timeout_seconds,
+        excluded_providers=tuple(settings.brev_excluded_providers.split(",")),
     )
 
 

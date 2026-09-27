@@ -49,8 +49,8 @@ Without Docker: PostgreSQL 16 on localhost, then `make install migrate`, and `ma
    over `ssh <instance>-host` (`BREV_EXEC_ON_HOST=true`), using the SSH config written by
    `brev refresh`; `BREV_SSH_CONNECT_TIMEOUT_SECONDS` (default 60) bounds each connection.
 5. **Timeouts**: first runs pull the vLLM image (several GB) and the model weights (~16 GB for an 8B bf16 model) onto
-   a fresh instance. Defaults: provisioning 1200 s (create + Brev setup + SSH), bootstrap
-   600 s, model ready 1500 s, job 3600 s.
+   a fresh instance. Defaults: provisioning 2100 s (create + Brev setup + SSH, room for one
+   provider switch), bootstrap 600 s, model ready 1500 s, job 5400 s.
    Measure with the smoke test and adjust.
 6. **Start**: set `EPHEMERA_MODE=real` and `make up`. The UI shows "Real mode · Brev".
 
@@ -89,7 +89,7 @@ Record the output in this file when done:
 | 2026-09-27 | L40S (real Brev) | `brev create` 190–195 s | — | — | delete + verify absent ≈ 35–45 s | ≈ 5 min | **Partial.** Provisioning, deletion and verification of absence confirmed on real Brev (2 jobs, both `FAILED` → GPU `DESTROYED`, COMPUTE = 0). Bootstrap never started: `brev exec` could not resolve the instance because `BREV_HOME` ≠ OS home (OpenSSH ignores `$HOME`); the SSH probe was also not retried. Both fixed; re-run pending. |
 | 2026-09-27 (run 3) | L40S (real Brev) | `brev create` 173 s | — | — | — | — | **Further.** SSH fix confirmed: `brev refresh` + `brev exec` OK, job reached BOOTSTRAPPING, remote mkdir and 2 uploads OK (each `brev copy` ≈ 24 s because it refreshes SSH config). A remote step then hung until the 300 s bootstrap timeout. Likely cause: Brev reports RUNNING before its instance setup (`build_status`) is COMPLETED. Fixed: wait for build COMPLETED, timeouts inside `bootstrap.sh`, per-step logging, larger time budgets. |
 | 2026-09-27 (run 4) | L40S (real Brev) | `brev create` ≈ 3–3.5 min, then Brev setup until build COMPLETED | — | — | delete + verify absent ≈ 35–70 s | — | **Further.** Build-status wait confirmed. The SSH probe `brev exec … true` then failed after exactly ≈ 103 s (exit 1) — Brev's own SSH wait, 20 × 5 s attempts — and the job hit `PROVISIONING_TIMEOUT`; GPU destroyed. Fixed: `ssh`/`scp` are now called directly with Brev's SSH config and a 60 s connect timeout; `brev refresh` is repeated every 3 failed probes. |
-| 2026-09-27 (run 5) | L40S (real Brev) | `brev create` 178 s, setup COMPLETED ≈ 1.5 min later | — | — | delete + verify absent ≈ 70 s | ≈ 21 min | **Blocked by network reachability.** Direct `ssh` worked as designed, but every TCP connection to the instance's SSH endpoint (`216.81.248.28:44689`, a provider-assigned high port) timed out for 15 min, until `PROVISIONING_TIMEOUT`; GPU destroyed. Not an Ephemera bug: the port is unreachable from the worker's network. Added: fail after `BREV_SSH_UNREACHABLE_TIMEOUT_SECONDS` (420 s) of TCP-level failures instead of the full provisioning budget, and `make net-check` to test outbound high ports without creating a GPU. |
+| 2026-09-27 (run 5) | L40S (real Brev) | `brev create` 178 s, setup COMPLETED ≈ 1.5 min later | — | — | delete + verify absent ≈ 70 s | ≈ 21 min | **Blocked by network reachability.** Direct `ssh` worked as designed, but every TCP connection to the instance's SSH endpoint (`216.81.248.28:44689`, a provider-assigned high port) timed out for 15 min, until `PROVISIONING_TIMEOUT`; GPU destroyed. `make net-check` then showed outbound high ports open from the same machine, so the provider's SSH port forwarding was at fault. Added: after `BREV_SSH_UNREACHABLE_TIMEOUT_SECONDS` (300 s) of TCP-level failures the instance is destroyed and re-created on the next candidate from **another provider** (at most twice; `BREV_EXCLUDED_PROVIDERS` to skip one permanently), `make net-check` to test outbound ports without creating a GPU. |
 
 ## Operating notes
 
