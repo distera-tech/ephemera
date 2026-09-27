@@ -31,8 +31,9 @@ class BrevComputeProvider:
     name = "brev"
     is_simulated = False
 
-    def __init__(self, client: BrevClient) -> None:
+    def __init__(self, client: BrevClient, *, ssh_probe_timeout_s: float = 120) -> None:
         self.client = client
+        self.ssh_probe_timeout_s = ssh_probe_timeout_s
 
     async def select_gpu(self, requirements: GpuRequirements) -> GpuSelection:
         offers = (
@@ -72,22 +73,45 @@ class BrevComputeProvider:
         deadline = time.monotonic() + timeout_s
         attempt = 0
         info: InstanceInfo | None = None
+        refreshed = False
+        last_error = ""
         while time.monotonic() < deadline:
-            info = await self.client.get_instance(name)
+            try:
+                info = await self.client.get_instance(name)
+            except BrevError as exc:
+                last_error = exc.message
+                info = None
             if info is not None and info.is_failed:
                 raise ComputeError(
                     f"instance entered status {info.status}", code=ErrorCode.PROVISIONING_FAILED
                 )
             if info is not None and info.is_running:
+                if not refreshed:
+                    # Make sure the `ssh <instance>` alias exists before probing.
+                    try:
+                        await self.client.refresh_ssh_config()
+                        refreshed = True
+                    except BrevError as exc:
+                        last_error = f"brev refresh: {exc.message}"
                 # Brev reports RUNNING before sshd is always reachable; prove we can execute.
-                probe = await self.client.exec(name, "true", timeout_s=60)
-                if probe.exit_code == 0:
-                    return info
+                # A slow or failed probe is retried until the deadline, never fatal on its own.
+                remaining = deadline - time.monotonic()
+                try:
+                    probe = await self.client.exec(
+                        name, "true", timeout_s=max(10.0, min(self.ssh_probe_timeout_s, remaining))
+                    )
+                    if probe.exit_code == 0:
+                        return info
+                    last_error = f"ssh probe exit {probe.exit_code}"
+                except BrevError as exc:
+                    last_error = exc.message
+                log.info("brev.ssh_probe_retry", extra={"attempt": attempt, "error": last_error})
             await _backoff_sleep(attempt)
             attempt += 1
         status = info.status if info else "absent"
         raise ComputeError(
-            f"instance not reachable over SSH within {timeout_s:.0f}s (last status: {status})",
+            f"instance not reachable over SSH within {timeout_s:.0f}s "
+            f"(last status: {status}; last error: {last_error or 'none'})",
             code=ErrorCode.PROVISIONING_TIMEOUT,
         )
 

@@ -27,7 +27,7 @@ RUN --mount=type=secret,id=extra_ca,required=false \
 FROM python:3.12-bookworm
 RUN ssh -V \
  && useradd --uid 10001 --create-home --shell /bin/bash ephemera \
- && mkdir -p /tmp/ephemera/jobs /tmp/ephemera/brev-home \
+ && mkdir -p /tmp/ephemera/jobs \
  && chown -R ephemera:ephemera /tmp/ephemera
 COPY --from=brev /out/brev /usr/local/bin/brev
 COPY --from=deps /opt/venv /opt/venv

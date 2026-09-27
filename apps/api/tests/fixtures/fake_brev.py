@@ -230,6 +230,10 @@ def cmd_exec(args: list[str]) -> int:
         return 1
     parts = command.split()
     if command == "true":
+        # Reproduces the real failure: first probe hangs until the caller's timeout.
+        if "probe_hang_once" in modes() and not (STATE / "probe_hung").exists():
+            (STATE / "probe_hung").write_text("1")
+            time.sleep(3600)
         return 0
     if parts[:4] == ["mkdir", "-p", "-m", "700"]:
         remote_path(name, parts[4]).mkdir(parents=True, exist_ok=True)
@@ -253,6 +257,7 @@ def main(argv: list[str]) -> int:
         "delete": cmd_delete,
         "copy": cmd_copy,
         "exec": cmd_exec,
+        "refresh": lambda a: 0,
         "set": lambda a: 0,
     }
     return handlers[cmd](rest)

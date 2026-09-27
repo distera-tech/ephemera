@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import pwd
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
@@ -42,8 +44,11 @@ class Settings(BaseSettings):
     brev_api_key: SecretStr | None = None
     brev_org: str | None = None
     brev_cli_path: str = "brev"
-    # Isolated HOME for the Brev CLI so its config/SSH files never mix with the host user's.
-    brev_home: Path = Path("/tmp/ephemera/brev-home")
+    # HOME given to the Brev CLI. It MUST be the OS user's home directory: Brev writes its
+    # SSH config to $HOME/.ssh/config, but OpenSSH reads ~/.ssh/config from the passwd entry
+    # and ignores $HOME, so any other value makes `brev exec`/`brev copy` hang.
+    # Run the worker as a dedicated OS user to keep Brev's files isolated.
+    brev_home: Path = Field(default_factory=lambda: Path(pwd.getpwuid(os.getuid()).pw_dir))
     brev_exec_on_host: bool = True
     brev_allow_cli_login: bool = False
     brev_instance_types: str = ""  # explicit override, comma separated, tried in order
@@ -152,6 +157,13 @@ class Settings(BaseSettings):
                 problems.append("MODEL_ID must be set in real mode")
             if self.inference_engine is InferenceEngine.NIM and self.ngc_api_key is None:
                 problems.append("INFERENCE_ENGINE=nim requires NGC_API_KEY")
+            ssh_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+            if self.brev_home.resolve() != ssh_home.resolve():
+                problems.append(
+                    f"BREV_HOME={self.brev_home} differs from the OS user's home {ssh_home}: "
+                    "OpenSSH would not find Brev's SSH config, so `brev exec` would hang. "
+                    "Unset BREV_HOME or set it to the user's home directory"
+                )
             if self.max_gpu_instances < 1:
                 problems.append("MAX_GPU_INSTANCES must be >= 1")
         if self.demo_force_inference_failure and not self.demo_allow_failure_injection:

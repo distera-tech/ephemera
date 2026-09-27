@@ -6,7 +6,7 @@
 |---|---|
 | Simulation mode (API, worker, PostgreSQL, UI, Compose) | **Validated** — unit/integration tests, Playwright E2E against `docker compose` |
 | Real-mode code path (Brev adapter, GPU selection, vLLM bootstrap protocol, teardown) | **Validated against a fake `brev` CLI** that mirrors brev-cli v0.6.335 syntax and JSON output, plus the real `bootstrap.sh` run with stubbed `nvidia-smi`/`docker`/`curl` |
-| **Real Brev GPU provisioning + real vLLM inference** | **Pending credentials.** The build environment had no `BREV_API_KEY` and its network policy blocked the Brev API and Hugging Face. It has **not** been run against real infrastructure. Run `scripts/real_smoke_test.py` (below) before relying on it. |
+| **Real Brev GPU provisioning + real vLLM inference** | **Provisioning + destruction validated on real Brev (2026-09-27); inference pending re-run after the SSH fix.** Before that: The build environment had no `BREV_API_KEY` and its network policy blocked the Brev API and Hugging Face. It has **not** been run against real infrastructure. Run `scripts/real_smoke_test.py` (below) before relying on it. |
 
 Brev CLI facts were verified from `brev --help` and source of v0.6.335 (built from the
 Go module proxy), not from memory — see `docs/implementation-plan.md` §0.
@@ -26,7 +26,10 @@ Without Docker: PostgreSQL 16 on localhost, then `make install migrate`, and `ma
 
 1. **Credentials** (in `.env`, never committed):
    * `BREV_API_KEY` — the CLI reads it natively; the worker refuses to start in real mode
-     without it (or `BREV_ALLOW_CLI_LOGIN=true` after `brev login` in `BREV_HOME`).
+     without it (or `BREV_ALLOW_CLI_LOGIN=true` after `brev login` as the worker's OS user).
+   * Do not point `BREV_HOME` anywhere other than the OS user's home directory: Brev writes its
+     SSH config to `$HOME/.ssh/config`, but OpenSSH reads the passwd home and ignores `$HOME`,
+     so `brev exec` would hang. Real mode refuses to start if they differ.
    * `BREV_ORG` — optional; the worker runs `brev set <org>` once.
    * `HF_TOKEN` — needed for gated models such as `meta-llama/Llama-3.1-8B-Instruct`.
      Accept the model licence on Hugging Face first and use a **read-only** token.
@@ -67,7 +70,7 @@ Record the output in this file when done:
 
 | Date | GPU / type | Provisioning | Model loading | Inference | Destruction | GPU runtime | Result |
 |---|---|---|---|---|---|---|---|
-| _pending_ | | | | | | | |
+| 2026-09-27 | L40S (real Brev) | `brev create` 190–195 s | — | — | delete + verify absent ≈ 35–45 s | ≈ 5 min | **Partial.** Provisioning, deletion and verification of absence confirmed on real Brev (2 jobs, both `FAILED` → GPU `DESTROYED`, COMPUTE = 0). Bootstrap never started: `brev exec` could not resolve the instance because `BREV_HOME` ≠ OS home (OpenSSH ignores `$HOME`); the SSH probe was also not retried. Both fixed; re-run pending. |
 
 ## Operating notes
 

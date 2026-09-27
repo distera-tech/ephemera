@@ -68,6 +68,11 @@ def create(name: str, instance_types: list[str], timeout_s: int) -> list[str]:
     ]
 
 
+def refresh() -> list[str]:
+    """Rewrite Brev's SSH config so `ssh <instance>` aliases resolve."""
+    return ["refresh"]
+
+
 def list_json() -> list[str]:
     return ["ls", "--json"]
 

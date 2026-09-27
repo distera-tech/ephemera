@@ -107,6 +107,9 @@ class BrevClient:
         env = {k: v for k in _PASSTHROUGH_ENV if (v := os.environ.get(k))}
         env.setdefault("PATH", "/usr/local/bin:/usr/bin:/bin")
         env["HOME"] = str(self.home)
+        # `brev exec` starts a daemonised ssh-agent whenever SSH_AUTH_SOCK is empty, leaking one
+        # agent per call. Brev's ssh config uses IdentityFile, so no agent is needed.
+        env["SSH_AUTH_SOCK"] = "/dev/null"
         env["BREV_NO_ANALYTICS"] = "1"
         env["DO_NOT_TRACK"] = "1"
         if self._api_key is not None:
@@ -220,6 +223,10 @@ class BrevClient:
 
     async def get_instance(self, name: str, timeout_s: float = 60) -> InstanceInfo | None:
         return next((i for i in await self.list_instances(timeout_s) if i.name == name), None)
+
+    async def refresh_ssh_config(self, timeout_s: float = 120) -> None:
+        await self.ensure_org()
+        await self.run(commands.refresh(), timeout_s=timeout_s)
 
     async def exec(self, name: str, command: str, timeout_s: float) -> ExecResult:
         result = await self.run(

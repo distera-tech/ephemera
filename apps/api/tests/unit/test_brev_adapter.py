@@ -146,3 +146,30 @@ async def test_list_ignores_foreign_instances(fake_brev: Path) -> None:
     )
     provider = BrevComputeProvider(client(fake_brev))
     assert [i.name for i in await provider.list_instances()] == [NAME]
+
+
+async def test_ssh_probe_timeout_is_retried_not_fatal(fake_brev: Path) -> None:
+    """Regression (real Brev run 2026-09-27): a hanging first `brev exec … true` failed the job."""
+    provider = BrevComputeProvider(client(fake_brev), ssh_probe_timeout_s=1)
+    await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
+    set_fake_mode(fake_brev, "probe_hang_once")
+    info = await provider.wait_until_ready(NAME, timeout_s=30)
+    assert info.is_running
+    argv = calls(fake_brev)
+    assert ["refresh"] in argv  # ssh aliases written before probing
+    assert sum(1 for c in argv if c[0] == "exec") >= 2
+
+
+async def test_brev_env_disables_ssh_agent(fake_brev: Path) -> None:
+    await client(fake_brev).list_instances()
+    env = json.loads((fake_brev / "last_env.json").read_text())
+    assert env["SSH_AUTH_SOCK"] == "/dev/null"
+
+
+def test_real_mode_rejects_brev_home_that_ssh_cannot_see(tmp_path: Path) -> None:
+    from app.core.config import Settings
+
+    bad = Settings(ephemera_mode="real", brev_api_key="bak-x", brev_home=tmp_path, _env_file=None)  # type: ignore[call-arg]
+    assert any("BREV_HOME" in p for p in bad.configuration_problems())
+    good = Settings(ephemera_mode="real", brev_api_key="bak-x", _env_file=None)  # type: ignore[call-arg]
+    assert not any("BREV_HOME" in p for p in good.configuration_problems())

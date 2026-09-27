@@ -15,7 +15,6 @@ x-backend: &backend
     DATABASE_URL: postgresql+asyncpg://ephemera:${POSTGRES_PASSWORD:-ephemera}@postgres:5432/ephemera
     DATA_DIR: /tmp/ephemera/jobs
     WORKER_ID: ephemera-worker-1
-    BREV_HOME: /tmp/ephemera/brev-home
   depends_on:
     postgres:
       condition: service_healthy
@@ -62,7 +61,8 @@ services:
     stop_grace_period: 10m
     volumes:
       - jobdata:/tmp/ephemera/jobs
-      - brevhome:/tmp/ephemera/brev-home
+      # Brev keeps its SSH config/keys in the OS user's home, which is where ssh looks.
+      - brevhome:/home/ephemera
 
   web:
     build:
