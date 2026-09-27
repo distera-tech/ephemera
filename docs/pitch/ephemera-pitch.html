@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Ephemera — Pitch deck</title>
+<style>
+  @page { size: 1920px 1080px; margin: 0; }
+  :root {
+    --bg: #07090c; --panel: #0d1117; --panel2: #121821; --line: #1e2733; --line2: #2b3746;
+    --fg: #e6edf3; --muted: #8b98a8; --dim: #5b6776;
+    --ok: #3fd07f; --okbg: #0e2a1b; --warn: #f2b33d; --warnbg: #2d220b; --bad: #ff5c5c; --badbg: #2e1012;
+    --accent: #76b900; --info: #4fb3ff;
+    --sans: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+    --mono: "DejaVu Sans Mono", "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--fg); font-family: var(--sans); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .slide { width: 1920px; height: 1080px; position: relative; overflow: hidden; page-break-after: always; break-after: page;
+    padding: 110px 130px 90px;
+    background:
+      radial-gradient(1100px 650px at 78% 20%, rgba(118,185,0,0.07), transparent 70%),
+      linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px) 0 0/48px 48px,
+      linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px) 0 0/48px 48px,
+      var(--bg); }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  .kicker { font-family: var(--mono); font-size: 22px; letter-spacing: 7px; color: var(--accent); text-transform: uppercase; }
+  h1 { font-size: 88px; line-height: 1.08; letter-spacing: -1.5px; font-weight: 700; }
+  h2 { font-size: 64px; line-height: 1.12; letter-spacing: -1px; font-weight: 700; margin-top: 18px; }
+  .lead { font-size: 32px; line-height: 1.5; color: var(--muted); margin-top: 26px; max-width: 1500px; }
+  .mono { font-family: var(--mono); }
+  .foot { position: absolute; left: 130px; right: 130px; bottom: 44px; display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 17px; letter-spacing: 3px; color: var(--dim); }
+  .card { background: var(--panel); border: 2px solid var(--line2); border-radius: 18px; padding: 36px 40px; }
+  .card h3 { font-size: 34px; font-weight: 700; margin-bottom: 14px; }
+  .card p, .card li { font-size: 25px; line-height: 1.5; color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 28px; }
+  .pill { display: inline-block; font-family: var(--mono); font-weight: 700; font-size: 20px; letter-spacing: 2px;
+    padding: 6px 14px; border-radius: 8px; border: 2px solid; }
+  .ok { color: var(--ok); border-color: rgba(63,208,127,.45); background: var(--okbg); }
+  .warn { color: var(--warn); border-color: rgba(242,179,61,.45); background: var(--warnbg); }
+  .bad { color: var(--bad); border-color: rgba(255,92,92,.45); background: var(--badbg); }
+  .neutral { color: var(--muted); border-color: var(--line2); background: var(--panel2); }
+  .green { color: var(--accent); } .okc { color: var(--ok); } .warnc { color: var(--warn); } .badc { color: var(--bad); }
+  ul.clean { list-style: none; }
+  ul.clean li { padding-left: 38px; position: relative; margin: 10px 0; }
+  ul.clean li::before { content: "▸"; position: absolute; left: 0; color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { font-size: 24px; padding: 13px 16px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font-family: var(--mono); font-size: 17px; letter-spacing: 3px; color: var(--muted); font-weight: 700; }
+  .shot { border: 2px solid var(--line2); border-radius: 14px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.55); }
+  .shot img { display: block; width: 100%; }
+  .tag { position: absolute; font-family: var(--mono); font-size: 16px; letter-spacing: 3px; padding: 6px 12px; border-radius: 6px; }
+  .big0 { font-family: var(--mono); font-weight: 700; color: var(--ok); }
+</style>
+</head>
+<body>
+
+<!-- 1. Title -->
+<section class="slide" style="display:flex; flex-direction:column; justify-content:center;">
+  <div style="display:flex; align-items:center; gap:28px;">
+    <svg width="92" height="92" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="#e6edf3" stroke-width="1.4"/>
+      <rect x="7.5" y="7.5" width="9" height="9" rx="1" fill="none" stroke="#76b900" stroke-width="1.2" stroke-dasharray="2 2"/><circle cx="12" cy="12" r="1.6" fill="#76b900"/></svg>
+    <div class="mono" style="font-size:84px; font-weight:700; letter-spacing:26px;">EPHEMERA</div>
+  </div>
+  <h1 style="margin-top:70px; max-width:1500px;">AI inference that disappears<br/>when the job is done.</h1>
+  <div class="mono" style="font-size:40px; letter-spacing:10px; color:var(--muted); margin-top:38px;">PROVISION. INFER. <span class="green">DESTROY.</span></div>
+  <div style="margin-top:70px; display:flex; gap:18px; align-items:center;">
+    <span class="pill ok" style="font-size:26px; padding:10px 22px;">COMPUTE = 0</span>
+    <span style="font-size:26px; color:var(--muted)">Open-source ephemeral GPU orchestrator · NVIDIA Brev · vLLM · open-weight LLM</span>
+  </div>
+  <div class="foot"><span>HACKATHON 2026</span><span>SYNTHETIC / PUBLIC DATA ONLY</span></div>
+</section>
+
+<!-- 2. Problem -->
+<section class="slide">
+  <div class="kicker">The problem</div>
+  <h2>Sensitive documents need AI.<br/>Today's options both leak something.</h2>
+  <div class="grid2" style="margin-top:70px;">
+    <div class="card" style="border-color:rgba(255,92,92,.35)">
+      <span class="pill bad">OPTION 1</span>
+      <h3 style="margin-top:22px;">Third-party AI API</h3>
+      <ul class="clean"><li>The document leaves your infrastructure</li><li>You trust someone else's retention policy</li><li>Hard to audit what happened to the data</li></ul>
+    </div>
+    <div class="card" style="border-color:rgba(255,92,92,.35)">
+      <span class="pill bad">OPTION 2</span>
+      <h3 style="margin-top:22px;">Always-on private GPU</h3>
+      <ul class="clean"><li>Paid 24/7 for work that arrives a few times a day</li><li>Data sits on a disk that never goes away</li><li>A permanent attack surface</li></ul>
+    </div>
+  </div>
+  <p class="lead" style="margin-top:56px;">Legal, finance and health teams have <b style="color:var(--fg)">intermittent</b>, <b style="color:var(--fg)">sensitive</b> AI workloads. Neither option fits.</p>
+  <div class="foot"><span>EPHEMERA</span><span>02</span></div>
+</section>
+
+<!-- 3. Solution -->
+<section class="slide">
+  <div class="kicker">The solution</div>
+  <h2>Compute-to-Zero: the GPU exists<br/>only for the workload.</h2>
+  <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:28px; margin-top:80px; align-items:stretch;">
+    <div class="card" style="text-align:center">
+      <div class="big0" style="font-size:150px; line-height:1">0</div>
+      <div class="mono" style="font-size:22px; letter-spacing:4px; color:var(--muted); margin-top:16px;">GPU BEFORE THE JOB</div>
+    </div>
+    <div class="card" style="text-align:center; border-color:rgba(242,179,61,.55)">
+      <div class="mono" style="font-size:150px; line-height:1; font-weight:700; color:var(--warn)">1</div>
+      <div class="mono" style="font-size:22px; letter-spacing:4px; color:var(--muted); margin-top:16px;">GPU DURING INFERENCE</div>
+    </div>
+    <div class="card" style="text-align:center; border-color:rgba(63,208,127,.55)">
+      <div class="big0" style="font-size:150px; line-height:1">0</div>
+      <div class="mono" style="font-size:22px; letter-spacing:4px; color:var(--muted); margin-top:16px;">GPU AFTER — VERIFIED</div>
+    </div>
+  </div>
+  <p class="lead" style="margin-top:64px;">When a document arrives, Ephemera provisions a GPU on NVIDIA Brev, runs an open-weight model in an isolated environment, returns a structured result, deletes temporary data, <b style="color:var(--fg)">destroys the GPU — and checks with the provider that it is gone.</b></p>
+  <div class="foot"><span>EPHEMERA</span><span>03</span></div>
+</section>
+
+<!-- 4. Lifecycle -->
+<section class="slide">
+  <div class="kicker">How it works</div>
+  <h2>An auditable lifecycle, not a chat box.</h2>
+  <div style="display:flex; gap:14px; margin-top:80px; align-items:stretch;" id="pipe"></div>
+  <div class="grid3" style="margin-top:70px;">
+    <div class="card"><h3>State machine</h3><p>14 explicit states. Every transition validated, timestamped and stored as an event.</p></div>
+    <div class="card"><h3>GPU selection</h3><p>L40S preferred from Brev's live catalogue, with configurable fallbacks. Nothing hard-coded.</p></div>
+    <div class="card"><h3>Local-only model</h3><p>vLLM bound to 127.0.0.1 on the instance. Requests run over Brev SSH. No public endpoint.</p></div>
+  </div>
+  <div class="foot"><span>EPHEMERA</span><span>04</span></div>
+</section>
+
+<!-- 5. Product -->
+<section class="slide">
+  <div class="kicker">The product</div>
+  <h2>The hero metric is a zero.</h2>
+  <div style="display:grid; grid-template-columns: 1.05fr 1fr; gap:40px; margin-top:52px;">
+    <div class="shot" style="position:relative;"><img src="../assets/dashboard.png" alt="Dashboard"/></div>
+    <div class="shot" style="position:relative; height:640px;"><img src="../assets/job-completed.png" alt="Job detail" style="margin-top:-40px"/></div>
+  </div>
+  <p style="font-size:22px; color:var(--dim); margin-top:26px;">Screenshots: simulation mode on synthetic documents (labelled in the UI). "COMPUTE = 0" requires both our database and the provider's own instance listing to agree.</p>
+  <div class="foot"><span>EPHEMERA</span><span>05</span></div>
+</section>
+
+<!-- 6. Invariant -->
+<section class="slide">
+  <div class="kicker">The core guarantee</div>
+  <h2>If we provision it, we destroy it —<br/>on every path.</h2>
+  <table style="margin-top:50px;">
+    <tr><th>HOW THE JOB ENDS</th><th>WHAT EPHEMERA DOES</th><th>TESTED</th></tr>
+    <tr><td>Success</td><td>Clean → destroy → verify absent → <span class="okc">COMPLETED</span></td><td><span class="pill ok">✓</span></td></tr>
+    <tr><td>Model / inference failure</td><td>Clean → destroy → verify → <span class="badc">FAILED</span>, GPU gone</td><td><span class="pill ok">✓</span></td></tr>
+    <tr><td>Provisioning half-failed</td><td>Destroy anyway — a failed create can still leave a VM</td><td><span class="pill ok">✓</span></td></tr>
+    <tr><td>Timeout · user cancel · worker SIGTERM</td><td>Workload cancelled, teardown shielded and completed</td><td><span class="pill ok">✓</span></td></tr>
+    <tr><td>Worker crash (SIGKILL)</td><td>Reconciliation on restart finds and destroys the orphan</td><td><span class="pill ok">✓</span></td></tr>
+    <tr><td>Destruction can't be verified</td><td><span class="badc">CLEANUP_FAILED</span>, new GPUs blocked until reconciled</td><td><span class="pill ok">✓</span></td></tr>
+  </table>
+  <div class="foot"><span>EPHEMERA</span><span>06</span></div>
+</section>
+
+<!-- 7. Real infra -->
+<section class="slide" style="padding-top:78px;">
+  <div class="kicker">Validated on real NVIDIA Brev</div>
+  <h2>Real L40S GPUs, really destroyed.</h2>
+  <div class="grid3" style="margin-top:44px;">
+    <div class="card" style="text-align:center"><div class="mono warnc" style="font-size:88px; font-weight:700">~3m15s</div><p style="margin-top:14px">real <span class="mono">brev create</span> of an L40S</p></div>
+    <div class="card" style="text-align:center"><div class="mono okc" style="font-size:88px; font-weight:700">~40s</div><p style="margin-top:14px">delete + verified absent via <span class="mono">brev ls</span></p></div>
+    <div class="card" style="text-align:center"><div class="mono okc" style="font-size:88px; font-weight:700">2 / 2</div><p style="margin-top:14px">jobs ended with GPU <b style="color:var(--ok)">DESTROYED</b> · COMPUTE = 0</p></div>
+  </div>
+  <div class="card" style="margin-top:28px; padding:26px 40px; border-color:rgba(242,179,61,.4)">
+    <p style="font-size:26px"><span class="pill warn">HONEST STATUS</span>&nbsp; Both first real jobs failed <i>before</i> inference — and Ephemera still destroyed the GPU, exactly as designed. Root cause found in the logs (SSH config path inside the container), fixed and regression-tested. The full real inference run is next.</p>
+  </div>
+  <div class="card" style="margin-top:24px; padding:22px 40px;">
+    <div class="mono" style="font-size:17px; letter-spacing:3px; color:var(--muted); margin-bottom:14px;">REAL WORKER LOG · 2026-09-27 · JOB e0e92679 (TIMES UTC)</div>
+    <div class="mono" style="display:grid; grid-template-columns: 170px 1fr; row-gap:5px; font-size:21px;">
+      <span style="color:var(--dim)">15:48:50</span><span>brev search gpu → L40S candidates</span>
+      <span style="color:var(--dim)">15:52:00</span><span class="warnc">brev create → L40S RUNNING (190 s)</span>
+      <span style="color:var(--dim)">15:53:05</span><span class="badc">bootstrap failed → teardown starts</span>
+      <span style="color:var(--dim)">15:53:09</span><span>brev delete ephemera-e0e92679a306 → OK</span>
+      <span style="color:var(--dim)">15:53:52</span><span class="okc">brev ls → instance absent · FAILED · COMPUTE = 0</span>
+    </div>
+  </div>
+  <div class="foot"><span>EPHEMERA</span><span>07</span></div>
+</section>
+
+<!-- 8. Architecture -->
+<section class="slide">
+  <div class="kicker">Architecture</div>
+  <h2>Hexagonal, boring, reliable.</h2>
+  <svg viewBox="0 0 1660 560" style="width:100%; margin-top:40px;">
+    <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8b98a8"/></marker></defs>
+    <rect x="4" y="4" width="1020" height="552" rx="18" fill="none" stroke="#2b3746" stroke-dasharray="8 8" stroke-width="2"/>
+    <text x="30" y="46" fill="#8b98a8" font-family="DejaVu Sans Mono" font-size="20" letter-spacing="3">CONTROL PLANE — ALWAYS ON, NO GPU</text>
+    <g font-family="DejaVu Sans Mono" text-anchor="middle">
+      <rect x="40" y="90" width="260" height="110" rx="12" fill="#121821" stroke="#2b3746" stroke-width="2"/><text x="170" y="140" fill="#e6edf3" font-size="26">Next.js UI</text><text x="170" y="175" fill="#8b98a8" font-size="18">same-origin /api</text>
+      <rect x="380" y="90" width="260" height="110" rx="12" fill="#121821" stroke="#2b3746" stroke-width="2"/><text x="510" y="140" fill="#e6edf3" font-size="26">FastAPI</text><text x="510" y="175" fill="#8b98a8" font-size="18">HTTP 202 · validation</text>
+      <rect x="720" y="90" width="270" height="110" rx="12" fill="#121821" stroke="#2b3746" stroke-width="2"/><text x="855" y="140" fill="#e6edf3" font-size="26">PostgreSQL</text><text x="855" y="175" fill="#8b98a8" font-size="18">jobs · events · queue</text>
+      <rect x="380" y="300" width="610" height="150" rx="12" fill="#121821" stroke="#76b900" stroke-width="3"/><text x="685" y="355" fill="#e6edf3" font-size="30">Worker · Orchestrator</text><text x="685" y="395" fill="#8b98a8" font-size="18">state machine · finally: destroy + verify</text><text x="685" y="425" fill="#8b98a8" font-size="18">reconciliation · limits · timeouts</text>
+      <rect x="40" y="320" width="260" height="110" rx="12" fill="#121821" stroke="#2b3746" stroke-width="2"/><text x="170" y="370" fill="#e6edf3" font-size="24">Job temp dir</text><text x="170" y="402" fill="#8b98a8" font-size="18">tmpfs · deleted</text>
+    </g>
+    <path d="M300 145 H376" stroke="#8b98a8" stroke-width="2" marker-end="url(#a)"/><path d="M640 145 H716" stroke="#8b98a8" stroke-width="2" marker-end="url(#a)"/>
+    <path d="M855 200 V296" stroke="#8b98a8" stroke-width="2" marker-end="url(#a)"/><path d="M380 375 H304" stroke="#8b98a8" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="1130" y="4" width="526" height="552" rx="18" fill="none" stroke="#f2b33d" stroke-dasharray="10 8" stroke-width="2"/>
+    <text x="1156" y="46" fill="#f2b33d" font-family="DejaVu Sans Mono" font-size="20" letter-spacing="3">EPHEMERAL GPU — PER JOB</text>
+    <g font-family="DejaVu Sans Mono" text-anchor="middle">
+      <rect x="1170" y="90" width="446" height="110" rx="12" fill="#121821" stroke="#2b3746" stroke-width="2"/><text x="1393" y="140" fill="#e6edf3" font-size="26">NVIDIA Brev instance</text><text x="1393" y="175" fill="#8b98a8" font-size="18">L40S · ephemera-&lt;id&gt;</text>
+      <rect x="1170" y="260" width="446" height="130" rx="12" fill="#121821" stroke="#2b3746" stroke-width="2"/><text x="1393" y="315" fill="#e6edf3" font-size="26">vLLM · open-weight 8B</text><text x="1393" y="352" fill="#8b98a8" font-size="18">127.0.0.1:8000 only</text>
+      <rect x="1170" y="440" width="446" height="90" rx="12" fill="#121821" stroke="#2b3746" stroke-width="2"/><text x="1393" y="494" fill="#8b98a8" font-size="20">job dir → removed → VM destroyed</text>
+    </g>
+    <path d="M990 375 H1166" stroke="#f2b33d" stroke-width="3" marker-end="url(#a)"/><text x="1078" y="360" fill="#8b98a8" font-family="DejaVu Sans Mono" font-size="18" text-anchor="middle">brev CLI / SSH</text>
+    <path d="M1393 200 V256" stroke="#8b98a8" stroke-width="2" marker-end="url(#a)"/><path d="M1393 390 V436" stroke="#8b98a8" stroke-width="2" marker-end="url(#a)"/>
+  </svg>
+  <p style="font-size:24px; color:var(--muted); margin-top:26px;">Ports &amp; adapters: swap Brev for another provider or vLLM for NVIDIA NIM without touching the orchestrator. No Kafka, no Redis, no Kubernetes — PostgreSQL is the durable queue.</p>
+  <div class="foot"><span>EPHEMERA</span><span>08</span></div>
+</section>
+
+<!-- 9. Security -->
+<section class="slide">
+  <div class="kicker">Security by design — not by claims</div>
+  <h2>The model has zero power.</h2>
+  <div class="grid2" style="margin-top:56px;">
+    <div class="card">
+      <h3 class="okc">What we built</h3>
+      <ul class="clean">
+        <li>Document = untrusted data: random-boundary delimiting, never in the system prompt</li>
+        <li>Model has no tools; output validated against a strict JSON schema</li>
+        <li>Fixed Brev argv only — filenames never reach a shell or CLI</li>
+        <li>Secrets redacted from logs; HF token never on a command line</li>
+        <li>PDF parsed in a CPU/memory-limited sandbox <i>before</i> any GPU exists</li>
+        <li>Threat model: 12 threats, each with mitigation + residual risk</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:rgba(255,92,92,.3)">
+      <h3 class="badc">What we refuse to claim</h3>
+      <ul class="clean">
+        <li>"100% secure"</li>
+        <li>"GDPR / HIPAA compliant"</li>
+        <li>"Unrecoverable deletion"</li>
+        <li>"Instant GPU"</li>
+      </ul>
+      <p style="margin-top:22px">We say: <b style="color:var(--fg)">ephemeral compute, application-level data deletion, auditable lifecycle.</b></p>
+    </div>
+  </div>
+  <div class="foot"><span>EPHEMERA</span><span>09</span></div>
+</section>
+
+<!-- 10. Engineering -->
+<section class="slide">
+  <div class="kicker">Built like infrastructure</div>
+  <h2>Proof, not slideware.</h2>
+  <div class="grid3" style="margin-top:60px;">
+    <div class="card" style="text-align:center"><div class="mono green" style="font-size:96px; font-weight:700">149</div><p>backend tests — unit + real PostgreSQL</p></div>
+    <div class="card" style="text-align:center"><div class="mono green" style="font-size:96px; font-weight:700">10/10</div><p>critical lifecycle scenarios covered</p></div>
+    <div class="card" style="text-align:center"><div class="mono green" style="font-size:96px; font-weight:700">CI ✓</div><p>ruff · mypy --strict · ESLint · Playwright E2E</p></div>
+  </div>
+  <div class="grid2" style="margin-top:36px;">
+    <div class="card"><p>Real-mode pipeline tested end-to-end against a <b style="color:var(--fg)">fake <span class="mono">brev</span> CLI</b> built from the real v0.6.335 syntax — plus the real GPU bootstrap script run against stubbed <span class="mono">nvidia-smi / docker / curl</span>.</p></div>
+    <div class="card"><p>Bugs caught before production: vLLM flag removed in v0.30, 10 MB proxy upload limit, <span class="mono">brev exec</span> re-running failed commands, SSH config path — each fixed with a regression test.</p></div>
+  </div>
+  <div class="foot"><span>EPHEMERA</span><span>10</span></div>
+</section>
+
+<!-- 11. Market & roadmap -->
+<section class="slide">
+  <div class="kicker">Who it's for · what's next</div>
+  <h2>Intermittent, sensitive AI workloads.</h2>
+  <div class="grid2" style="margin-top:56px;">
+    <div class="card">
+      <h3>Users</h3>
+      <ul class="clean">
+        <li>Legal teams reviewing contracts</li>
+        <li>Finance &amp; compliance analysing reports</li>
+        <li>Health &amp; public-sector document triage</li>
+        <li>Any team that can't justify a 24/7 GPU</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Roadmap</h3>
+      <ul class="clean">
+        <li>Full real-inference validation + published timings</li>
+        <li>NVIDIA NIM provider behind the same port</li>
+        <li>Auth &amp; multi-tenancy (ownership checks already in place)</li>
+        <li>Long documents: chunking, OCR</li>
+        <li>Opt-in warm pool with explicit TTL</li>
+      </ul>
+    </div>
+  </div>
+  <p class="lead" style="margin-top:40px;">Cost story, stated honestly: we show the real GPU runtime per job — <span class="mono" style="color:var(--fg)">CREATED → USED → DESTROYED</span> — never an invented savings percentage.</p>
+  <div class="foot"><span>EPHEMERA</span><span>11</span></div>
+</section>
+
+<!-- 12. Close -->
+<section class="slide" style="display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+  <div style="font-size:54px; line-height:1.5; color:var(--muted); max-width:1500px;">
+    Ephemera doesn't keep an AI GPU waiting for work.<br/>
+    <span style="color:var(--fg)">When the work arrives, it provisions compute.</span><br/>
+    <span style="color:var(--fg)">It infers. It cleans up. It destroys.</span>
+  </div>
+  <div style="margin-top:70px;"><span class="pill ok" style="font-size:64px; padding:20px 50px; letter-spacing:12px; border-width:4px;">COMPUTE = 0</span></div>
+  <div class="mono" style="margin-top:70px; font-size:44px; font-weight:700; letter-spacing:22px;">EPHEMERA</div>
+  <div class="mono" style="margin-top:22px; font-size:22px; color:var(--dim); letter-spacing:2px;">github.com/distera-tech/ephemera · Apache-2.0</div>
+  <div class="foot" style="justify-content:center"><span>HACKATHON PROTOTYPE · SYNTHETIC DATA · APPLICATION-LEVEL DATA DELETION</span></div>
+</section>
+
+<script>
+  const steps = ["QUEUED", "PROVISION", "BOOTSTRAP", "LOAD MODEL", "INFER", "CLEAN", "DESTROY", "VERIFY", "COMPUTE = 0"];
+  const pipe = document.getElementById("pipe");
+  steps.forEach((s, i) => {
+    const last = i === steps.length - 1;
+    const hot = i >= 1 && i <= 4;
+    const d = document.createElement("div");
+    d.style.cssText = `flex:1; text-align:center; padding:26px 6px; border-radius:14px; font-family:var(--mono); font-weight:700;
+      font-size:20px; letter-spacing:1px; border:2px solid ${last ? "rgba(63,208,127,.6)" : hot ? "rgba(242,179,61,.5)" : "var(--line2)"};
+      background:${last ? "var(--okbg)" : hot ? "var(--warnbg)" : "var(--panel)"}; color:${last ? "var(--ok)" : hot ? "var(--warn)" : "var(--fg)"}`;
+    d.innerHTML = `<div style="font-size:15px; color:var(--dim); margin-bottom:10px">${String(i + 1).padStart(2, "0")}</div>${s}`;
+    pipe.appendChild(d);
+  });
+</script>
+</body>
+</html>
