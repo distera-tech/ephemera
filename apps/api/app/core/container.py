@@ -50,6 +50,8 @@ def build_inference(settings: Settings) -> InferenceProvider:
         gpu_memory_utilization=settings.vllm_gpu_memory_utilization,
         hf_token=settings.hf_token.get_secret_value() if settings.hf_token else None,
         transfer_timeout_s=settings.transfer_timeout_seconds,
+        inference_timeout_s=settings.inference_timeout_seconds,
+        min_free_disk_gb=settings.gpu_min_free_disk_gb,
     )
 
 

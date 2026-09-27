@@ -209,6 +209,8 @@ def bootstrap(name: str, sub: str, job_dir: str) -> int:
         (STATE / "model_started").write_text("1")
         return ok()
     if sub == "health":
+        if "start_failed" in m:
+            return err("start_failed", "pull:failed to pull vllm/vllm-openai:v0.30.0-cu129")
         if "model_crash" in m:
             return err("container_exited", "model container not running (exit code 1)")
         return ok()
@@ -219,6 +221,9 @@ def bootstrap(name: str, sub: str, job_dir: str) -> int:
         payload = json.loads(req.read_text())
         (STATE / "last_request_keys.json").write_text(json.dumps(sorted(payload)))
         req.unlink()
+        if "schema_400_once" in m and not (STATE / "schema_400").exists():
+            (STATE / "schema_400").write_text("1")
+            return err("http", "HTTP 400 unsupported JSON schema keyword")
         if "infer_http_error" in m:
             return err("http", "inference endpoint returned HTTP 500")
         content = "not json at all" if "infer_bad_json" in m else json.dumps(VALID_ANALYSIS)

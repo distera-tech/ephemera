@@ -57,7 +57,7 @@ the Brev and vLLM adapters (or simulators). Details: [docs/architecture.md](docs
 | API / worker | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async) + asyncpg, Alembic |
 | Database | PostgreSQL 16 (also the durable job queue — no Redis/Celery/Kafka) |
 | GPU | NVIDIA Brev (CLI v0.6.335), L40S preferred, configurable fallbacks |
-| Inference | vLLM `v0.30.0` (OpenAI-compatible, JSON-schema output); NIM-ready port |
+| Inference | vLLM `v0.30.0` (`-cu129` image) (OpenAI-compatible, JSON-schema output); NIM-ready port |
 | Model | Configurable `MODEL_ID`, default `meta-llama/Llama-3.1-8B-Instruct` (open-weight, gated) |
 | Documents | PyMuPDF in a resource-limited subprocess |
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |

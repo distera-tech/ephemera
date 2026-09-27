@@ -179,3 +179,22 @@ async def test_real_mode_destroy_failure_is_cleanup_failed(
     await submit(repo, workspace, make_pdf())
     blocked, reason = await repo.claim_next("real-test", 5, 1)
     assert blocked is None and reason == "max_gpu_instances"
+
+
+async def test_real_mode_model_start_failure_is_reported(repo, workspace, fake_brev: Path) -> None:  # type: ignore[no-untyped-def]
+    set_fake_mode(fake_brev, "start_failed")
+    _, status, job, compute = await run(repo, workspace, fake_brev)
+    assert status is JobStatus.FAILED and job.error_code == ErrorCode.MODEL_STARTUP_FAILED
+    assert "failed to pull" in (job.error_message or "")
+    assert await compute.list_instances() == []
+
+
+async def test_real_mode_schema_rejection_falls_back_without_response_format(
+    repo, workspace, fake_brev: Path
+) -> None:  # type: ignore[no-untyped-def]
+    set_fake_mode(fake_brev, "schema_400_once")
+    _, status, job, compute = await run(repo, workspace, fake_brev)
+    assert status is JobStatus.COMPLETED, job.error_message
+    # The retried request no longer carries response_format; output was still validated.
+    assert "response_format" not in json.loads((fake_brev / "last_request_keys.json").read_text())
+    assert await compute.list_instances() == []

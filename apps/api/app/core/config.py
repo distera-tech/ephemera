@@ -61,13 +61,16 @@ class Settings(BaseSettings):
     gpu_min_compute_capability: float | None = 8.0
     gpu_min_disk_gb: float | None = None
     gpu_max_candidates: int = 5
+    gpu_min_free_disk_gb: int = 50  # checked on the instance before pulling image + weights
 
     # --- Model / inference ----------------------------------------------------------------
     inference_engine: InferenceEngine = InferenceEngine.VLLM
     model_id: str = "meta-llama/Llama-3.1-8B-Instruct"
     hf_token: SecretStr | None = None
     ngc_api_key: SecretStr | None = None
-    vllm_image: str = "vllm/vllm-openai:v0.30.0"
+    # CUDA 12.9 build: the default v0.30.0 tag is CUDA 13.0 and needs NVIDIA driver >= 580,
+    # which many cloud GPU images do not ship yet.
+    vllm_image: str = "vllm/vllm-openai:v0.30.0-cu129"
     vllm_max_model_len: int = 16384
     vllm_gpu_memory_utilization: float = 0.90
     max_output_tokens: int = 1500
@@ -75,10 +78,10 @@ class Settings(BaseSettings):
     # --- Safety limits --------------------------------------------------------------------
     # Calibrated on real Brev L40S runs: create ~3 min, instance setup a few more minutes,
     # each `brev copy` ~25 s (it refreshes SSH config), then image + weights download.
-    max_job_runtime_seconds: int = 2700
+    max_job_runtime_seconds: int = 3600
     max_provisioning_seconds: int = 1200
     bootstrap_timeout_seconds: int = 600
-    model_ready_timeout_seconds: int = 900
+    model_ready_timeout_seconds: int = 1500
     transfer_timeout_seconds: int = 120
     inference_timeout_seconds: int = 240
     cleanup_timeout_seconds: int = 120
@@ -90,7 +93,7 @@ class Settings(BaseSettings):
     max_queued_jobs: int = 20
     max_document_size_mb: float = 25
     max_document_pages: int = 100
-    max_input_chars: int = 40000
+    max_input_chars: int = 32000  # keeps prompt + schema + output inside a 16k context
 
     # --- Data retention -------------------------------------------------------------------
     result_retention_seconds: int = 3600
