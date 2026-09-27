@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     # Per-attempt SSH connect budget. Over Brev's cloudflared tunnel the first connection
     # after setup can take well over the 5 s `brev exec` allows.
     brev_ssh_connect_timeout_seconds: int = Field(default=60, ge=5, le=600)
+    # Stop (and destroy the GPU) once SSH has been unreachable at the TCP level this long.
+    brev_ssh_unreachable_timeout_seconds: int = Field(default=420, ge=60, le=3600)
     brev_allow_cli_login: bool = False
     brev_instance_types: str = ""  # explicit override, comma separated, tried in order
     brev_create_timeout_seconds: int = 600

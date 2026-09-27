@@ -4,7 +4,7 @@ WEB := apps/web
 COMPOSE := docker compose -f infra/docker-compose.yml
 export DATABASE_URL ?= postgresql+asyncpg://ephemera:ephemera@localhost:5432/ephemera
 
-.PHONY: help install up down logs migrate api worker web test test-unit lint typecheck e2e demo-docs check
+.PHONY: help install up down logs net-check migrate api worker web test test-unit lint typecheck e2e demo-docs check
 
 help:  ## Show targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -22,6 +22,11 @@ down:  ## Stop the stack (worker gets 10 min to tear down any GPU)
 
 logs:  ## Follow worker logs
 	$(COMPOSE) logs -f worker
+
+# Runs scripts/net_check.py inside the worker container (the network path ssh uses).
+# Optional: make net-check TARGET=<ip>:<port>  (e.g. the endpoint from a worker log line).
+net-check:  ## Test outbound TCP from the worker (SSH to Brev instances needs high ports)
+	@$(COMPOSE) exec -T worker python - $(TARGET) < scripts/net_check.py
 
 migrate:  ## Apply database migrations (local Postgres)
 	cd $(API) && uv run alembic upgrade head

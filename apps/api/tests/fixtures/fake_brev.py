@@ -308,6 +308,14 @@ def main(argv: list[str]) -> int:
     REMOTE.mkdir(exist_ok=True)
     if argv and argv[0] in ("__ssh", "__scp"):
         argv = to_brev_argv(argv[0][2:], argv[1:])
+        if argv[0] == "exec" and "ssh_unreachable" in modes():
+            # Reproduces real run 5: TCP to the instance's SSH port never connects.
+            log_call(argv)
+            print(
+                "ssh: connect to host 203.0.113.7 port 44689: Connection timed out",
+                file=sys.stderr,
+            )
+            return 255
         if (
             argv[0] == "exec"
             and "ssh_timeout_once" in modes()

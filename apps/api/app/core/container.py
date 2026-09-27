@@ -36,7 +36,9 @@ def build_compute(settings: Settings) -> ComputeProvider:
         exec_on_host=settings.brev_exec_on_host,
         ssh_connect_timeout_s=settings.brev_ssh_connect_timeout_seconds,
     )
-    return BrevComputeProvider(client)
+    return BrevComputeProvider(
+        client, ssh_unreachable_timeout_s=settings.brev_ssh_unreachable_timeout_seconds
+    )
 
 
 def build_inference(settings: Settings) -> InferenceProvider:

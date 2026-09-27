@@ -22,6 +22,16 @@ from app.infrastructure.brev.exceptions import BrevError, BrevTimeoutError
 
 log = get_logger("brev.lifecycle")
 
+# ssh stderr fragments meaning "no TCP route to the instance's SSH endpoint" (as opposed to
+# an auth, proxy or remote-command problem).
+_UNREACHABLE_HINTS = (
+    "connection timed out",
+    "operation timed out",
+    "no route to host",
+    "network is unreachable",
+    "connection refused",
+)
+
 
 async def _backoff_sleep(attempt: int, base: float = 2.0, cap: float = 15.0) -> None:
     await asyncio.sleep(min(cap, base * (1.6**attempt)))
@@ -31,9 +41,18 @@ class BrevComputeProvider:
     name = "brev"
     is_simulated = False
 
-    def __init__(self, client: BrevClient, *, ssh_probe_timeout_s: float = 120) -> None:
+    def __init__(
+        self,
+        client: BrevClient,
+        *,
+        ssh_probe_timeout_s: float = 120,
+        ssh_unreachable_timeout_s: float = 420,
+    ) -> None:
         self.client = client
         self.ssh_probe_timeout_s = ssh_probe_timeout_s
+        # Give up early (and destroy the paid GPU) when the SSH endpoint stays unreachable at
+        # the TCP level after Brev reports setup COMPLETED; waiting longer has never helped.
+        self.ssh_unreachable_timeout_s = ssh_unreachable_timeout_s
 
     async def select_gpu(self, requirements: GpuRequirements) -> GpuSelection:
         offers = (
@@ -74,6 +93,7 @@ class BrevComputeProvider:
         attempt = 0
         info: InstanceInfo | None = None
         failed_probes = 0
+        unreachable_since: float | None = None
         last_error = ""
         while time.monotonic() < deadline:
             try:
@@ -117,6 +137,20 @@ class BrevComputeProvider:
                 except BrevError as exc:
                     last_error = exc.message
                 failed_probes += 1
+                if any(h in last_error.lower() for h in _UNREACHABLE_HINTS):
+                    unreachable_since = unreachable_since or time.monotonic()
+                    if time.monotonic() - unreachable_since >= self.ssh_unreachable_timeout_s:
+                        raise ComputeError(
+                            "the instance's SSH endpoint was unreachable from the worker for "
+                            f"{self.ssh_unreachable_timeout_s:.0f}s after setup completed "
+                            f"({last_error}). Usually the local network, VPN or firewall blocks "
+                            "outbound connections to non-standard ports (run `make net-check`), "
+                            "or this provider's port forwarding is broken (pin another type "
+                            "with BREV_INSTANCE_TYPES)",
+                            code=ErrorCode.PROVISIONING_FAILED,
+                        )
+                else:
+                    unreachable_since = None
                 log.info("brev.ssh_probe_retry", extra={"attempt": attempt, "error": last_error})
             await _backoff_sleep(attempt)
             attempt += 1

@@ -229,3 +229,14 @@ async def test_ssh_argv_and_env(fake_brev: Path, tmp_path: Path) -> None:
     (fake_brev / "remote" / NAME / "tmp").mkdir(parents=True)
     await c.copy_to(NAME, src, "/tmp/f.txt", timeout_s=30)
     assert calls(fake_brev)[-1] == ["copy", "--host", str(src), f"{NAME}:/tmp/f.txt"]
+
+
+async def test_persistently_unreachable_ssh_fails_fast(fake_brev: Path) -> None:
+    """Real run 5: TCP to the instance's SSH port timed out for 15 min; stop early instead."""
+    provider = BrevComputeProvider(client(fake_brev), ssh_unreachable_timeout_s=0.5)
+    await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
+    set_fake_mode(fake_brev, "ssh_unreachable")
+    with pytest.raises(ComputeError) as err:
+        await provider.wait_until_ready(NAME, timeout_s=60)
+    assert err.value.code is ErrorCode.PROVISIONING_FAILED
+    assert "203.0.113.7 port 44689" in err.value.message and "net-check" in err.value.message
