@@ -206,7 +206,8 @@ async def test_first_ssh_failure_after_setup_is_retried(fake_brev: Path) -> None
     await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
     set_fake_mode(fake_brev, "ssh_timeout_once")
     assert (await provider.wait_until_ready(NAME, timeout_s=60)).is_running
-    assert sum(1 for c in calls(fake_brev) if c == ["exec", "--host", NAME, "true"]) == 2
+    probes = [c for c in calls(fake_brev) if c[0] == "exec" and c[-1] == "true"]
+    assert len(probes) == 2
 
 
 async def test_ssh_argv_and_env(fake_brev: Path, tmp_path: Path) -> None:
@@ -216,7 +217,7 @@ async def test_ssh_argv_and_env(fake_brev: Path, tmp_path: Path) -> None:
     assert argv[-2:] == [f"{NAME}-host", "true"]
     for opt in ("BatchMode=yes", "RequestTTY=no", "ControlMaster=no", "ConnectTimeout=60"):
         assert opt in argv
-    c = client(fake_brev)
+    c = client(fake_brev, exec_on_host=True)
     (fake_brev / "instances.json").write_text(
         json.dumps({NAME: {"name": NAME, "status": "RUNNING"}})
     )
@@ -267,3 +268,26 @@ async def test_excluded_providers_are_never_selected(fake_brev: Path) -> None:
     provider = BrevComputeProvider(client(fake_brev), excluded_providers=("Hyperstack",))
     selection = await provider.select_gpu(REQ)
     assert [c.instance_type for c in selection.candidates] == ["a100.1x"]
+
+
+@pytest.mark.parametrize(
+    ("mode", "pinned_host"),
+    [("host_alias_unreachable", False), ("instance_alias_unreachable", True)],
+)
+async def test_auto_ssh_target_pins_the_alias_that_answers(
+    fake_brev: Path, tmp_path: Path, mode: str, pinned_host: bool
+) -> None:
+    """Real runs 5-6: `<name>-host` (legacy host endpoint) timed out on three providers, while
+    Brev's own tools use `<name>` (SSH-access endpoint). Auto mode probes both and pins one."""
+    c = client(fake_brev)
+    provider = BrevComputeProvider(c)
+    await provider.provision(NAME, await provider.select_gpu(REQ), timeout_s=60)
+    set_fake_mode(fake_brev, mode)
+    await provider.wait_until_ready(NAME, timeout_s=60)
+    src = tmp_path / "f.txt"
+    src.write_text("x")
+    (fake_brev / "remote" / NAME / "tmp").mkdir(parents=True, exist_ok=True)
+    await c.copy_to(NAME, src, "/tmp/f.txt", timeout_s=30)
+    assert (await c.exec(NAME, "true", timeout_s=30)).exit_code == 0
+    later = calls(fake_brev)[-2:]
+    assert all(("--host" in call) is pinned_host for call in later)

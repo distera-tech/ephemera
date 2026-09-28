@@ -88,7 +88,8 @@ async def test_real_mode_success_path(repo, workspace, fake_brev: Path) -> None:
     verbs = [a[0] for a in argv]
     assert verbs.index("search") < verbs.index("create") < verbs.index("delete")
     execs = [a[-1] for a in argv if a[0] == "exec"]
-    assert all(a[1] == "--host" for a in argv if a[0] in ("exec", "copy"))
+    # Default (auto): Brev's SSH-access alias `<name>` answers first and is used throughout.
+    assert all("--host" not in a for a in argv if a[0] in ("exec", "copy"))
     subs = [e.split()[2] for e in execs if "bootstrap.sh" in e]
     assert subs == ["prepare", "start-model", "health", "infer", "cleanup"]
     # Only fixed, trusted commands ever reach the instance.

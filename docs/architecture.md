@@ -157,8 +157,10 @@ sequenceDiagram
 `cleanup`) invoked with a UUID-derived path — never user data. Every handled outcome
 **exits 0** and prints `EPHEMERA_RESULT=ok` or `EPHEMERA_RESULT=error:<reason>:<message>`.
 A non-zero exit means only "transport failed" (ssh itself exits 255). Remote commands and
-file transfers run through OpenSSH `ssh`/`scp` directly, against the `<instance>-host`
-alias that `brev refresh` writes (non-interactive options, `ConnectTimeout` 60 s, no
+file transfers run through OpenSSH `ssh`/`scp` directly, against the aliases that `brev
+refresh` writes: `<instance>` (Brev's per-user SSH-access endpoint, which `brev shell` uses;
+the VM itself in the default VM mode) is probed first, the legacy `<instance>-host` second,
+and the one that answers is pinned for the job (non-interactive options, `ConnectTimeout` 60 s, no
 connection multiplexing). `brev exec`/`brev copy` (v0.6.335) are not used: they give each
 SSH attempt only 5 s — too short for Brev's cloudflared tunnel right after setup (real run
 4) — re-run a command that exits non-zero, and refresh the whole SSH config on every copy

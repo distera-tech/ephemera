@@ -167,6 +167,7 @@ class BrevComputeProvider:
                 "next_types": [c.instance_type for c in candidates],
             },
         )
+        self.client.forget_target(name)
         await self.client.delete(name, timeout_s=300)
         if not await self.verify_destroyed(name, timeout_s=max(60.0, deadline - time.monotonic())):
             return False
@@ -212,14 +213,26 @@ class BrevComputeProvider:
                 # Brev reports RUNNING before sshd is always reachable; prove we can execute.
                 # A slow or failed probe is retried until the deadline, never fatal on its own.
                 remaining = deadline - time.monotonic()
+                # Alternate between Brev's SSH-access alias `<name>` (what `brev shell` uses)
+                # and the legacy `<name>-host` alias, whose port was unreachable on real runs.
+                targets = self.client.ssh_targets()
+                host = targets[failed_probes % len(targets)]
+                alias = f"{name}-host" if host else name
                 try:
                     probe = await self.client.exec(
-                        name, "true", timeout_s=max(10.0, min(self.ssh_probe_timeout_s, remaining))
+                        name,
+                        "true",
+                        timeout_s=max(10.0, min(self.ssh_probe_timeout_s, remaining)),
+                        host=host,
                     )
                     if probe.exit_code == 0:
+                        self.client.pin_target(name, host)
+                        log.info("brev.ssh_ready", extra={"alias": alias})
                         return info
                     detail = probe.stderr.strip().splitlines()[-1:] or [""]
-                    last_error = f"ssh probe exit {probe.exit_code}: {detail[0][:300]}".rstrip(": ")
+                    last_error = f"ssh {alias} exit {probe.exit_code}: {detail[0][:300]}".rstrip(
+                        ": "
+                    )
                 except BrevError as exc:
                     last_error = exc.message
                 failed_probes += 1
@@ -268,6 +281,7 @@ class BrevComputeProvider:
     async def destroy(self, name: str, timeout_s: float) -> None:
         require_ephemera_name(name)
         self._attempts.pop(name, None)
+        self.client.forget_target(name)
         await self.client.delete(name, timeout_s=timeout_s)
 
     async def get_instance(self, name: str) -> InstanceInfo | None:

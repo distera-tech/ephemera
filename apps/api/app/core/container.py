@@ -33,7 +33,7 @@ def build_compute(settings: Settings) -> ComputeProvider:
         home=settings.brev_home,
         api_key=settings.brev_api_key,
         org=settings.brev_org,
-        exec_on_host=settings.brev_exec_on_host,
+        exec_on_host={"auto": None, "instance": False, "host": True}[settings.brev_ssh_target],
         ssh_connect_timeout_s=settings.brev_ssh_connect_timeout_seconds,
     )
     return BrevComputeProvider(

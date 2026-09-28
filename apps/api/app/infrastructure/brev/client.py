@@ -96,7 +96,7 @@ class BrevClient:
         home: Path,
         api_key: SecretStr | None,
         org: str | None,
-        exec_on_host: bool = True,
+        exec_on_host: bool | None = None,
         ssh_path: str = "ssh",
         scp_path: str = "scp",
         ssh_connect_timeout_s: int = 60,
@@ -105,7 +105,10 @@ class BrevClient:
         self.home = home
         self._api_key = api_key
         self.org = org
+        # None = auto: probe `<name>` (Brev's SSH-access endpoint, the VM itself in the default
+        # VM mode) first, then the legacy `<name>-host` alias; the one that answers is pinned.
         self.exec_on_host = exec_on_host
+        self._pinned_target: dict[str, bool] = {}
         self.ssh_path = ssh_path
         self.scp_path = scp_path
         self.ssh_connect_timeout_s = ssh_connect_timeout_s
@@ -262,15 +265,32 @@ class BrevClient:
         await self.ensure_org()
         await self.run(commands.refresh(), timeout_s=timeout_s)
 
+    def ssh_targets(self) -> list[bool]:
+        """Aliases to probe, as `host` flags: False = `<name>`, True = `<name>-host`."""
+        return [False, True] if self.exec_on_host is None else [self.exec_on_host]
+
+    def pin_target(self, name: str, host: bool) -> None:
+        self._pinned_target[name] = host
+
+    def forget_target(self, name: str) -> None:
+        self._pinned_target.pop(name, None)
+
+    def _host(self, name: str, host: bool | None) -> bool:
+        if host is not None:
+            return host
+        return self._pinned_target.get(name, self.ssh_targets()[0])
+
     def _connect_timeout(self, timeout_s: float) -> int:
         return int(max(5, min(self.ssh_connect_timeout_s, timeout_s - 1)))
 
-    async def exec(self, name: str, command: str, timeout_s: float) -> ExecResult:
+    async def exec(
+        self, name: str, command: str, timeout_s: float, *, host: bool | None = None
+    ) -> ExecResult:
         """Run one command over SSH. Exit 255 means ssh itself failed (transport)."""
         args = commands.ssh_exec(
             name,
             command,
-            host=self.exec_on_host,
+            host=self._host(name, host),
             connect_timeout_s=self._connect_timeout(timeout_s),
         )
         result = await self.run(
@@ -290,7 +310,7 @@ class BrevClient:
             name,
             str(local_path),
             remote_path,
-            host=self.exec_on_host,
+            host=self._host(name, None),
             connect_timeout_s=self._connect_timeout(timeout_s),
         )
         await self.run(args, timeout_s=timeout_s, binary=self.scp_path, label="copy")
@@ -302,7 +322,7 @@ class BrevClient:
             name,
             remote_path,
             str(local_path),
-            host=self.exec_on_host,
+            host=self._host(name, None),
             connect_timeout_s=self._connect_timeout(timeout_s),
         )
         await self.run(args, timeout_s=timeout_s, binary=self.scp_path, label="copy")

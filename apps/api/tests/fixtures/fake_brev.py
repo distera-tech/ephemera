@@ -308,11 +308,19 @@ def main(argv: list[str]) -> int:
     REMOTE.mkdir(exist_ok=True)
     if argv and argv[0] in ("__ssh", "__scp"):
         argv = to_brev_argv(argv[0][2:], argv[1:])
-        unreachable = "ssh_unreachable" in modes() or (
+        m = modes()
+        via_host = "--host" in argv
+        unreachable = (
+            "ssh_unreachable" in m
+            # Real runs 5-6: the legacy `<name>-host` endpoint never answered.
+            or ("host_alias_unreachable" in m and via_host)
+            or ("instance_alias_unreachable" in m and not via_host)
+        )
+        unreachable = unreachable or (
             "ssh_unreachable_l40s" in modes()
             and load().get(argv[-2], {}).get("instance_type") == "l40s.1x"
         )
-        if argv[0] == "exec" and unreachable:
+        if argv[0] in ("exec", "copy") and unreachable:
             # Reproduces real run 5: TCP to the instance's SSH port never connects.
             log_call(argv)
             print(

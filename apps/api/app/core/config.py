@@ -7,6 +7,7 @@ import pwd
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -49,7 +50,9 @@ class Settings(BaseSettings):
     # and ignores $HOME, so any other value makes ssh/scp to the instance fail.
     # Run the worker as a dedicated OS user to keep Brev's files isolated.
     brev_home: Path = Field(default_factory=lambda: Path(pwd.getpwuid(os.getuid()).pw_dir))
-    brev_exec_on_host: bool = True
+    # Which SSH alias `brev refresh` writes is used: auto (try `<name>`, Brev's SSH-access
+    # endpoint, then legacy `<name>-host`), instance (`<name>` only) or host (`-host` only).
+    brev_ssh_target: Literal["auto", "instance", "host"] = "auto"
     # Per-attempt SSH connect budget. Over Brev's cloudflared tunnel the first connection
     # after setup can take well over the 5 s `brev exec` allows.
     brev_ssh_connect_timeout_seconds: int = Field(default=60, ge=5, le=600)
