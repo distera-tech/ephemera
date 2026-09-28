@@ -65,9 +65,14 @@ load_runtime_env_optional() {
 
 # Last relevant lines of the model container log, for error messages. Never includes tokens.
 container_hint() {
-  "${DOCKER[@]}" logs --tail 300 "$CONTAINER" 2>&1 \
-    | grep -iE "error|denied|gated|unauthori|401|403|restricted|out of memory|cuda|driver|no space" \
-    | grep -viE "hf_[a-z0-9]|token=" | tail -n 2 | tr '\n' ' ' | cut -c1-280 || true
+  local logs hint
+  logs="$("${DOCKER[@]}" logs --tail 400 "$CONTAINER" 2>&1 | grep -viE "hf_[a-z0-9]|token=" || true)"
+  # Prefer the final exception / known causes; otherwise the last lines of the log.
+  hint="$(printf '%s\n' "$logs" \
+    | grep -iE "error|exception|denied|gated|unauthori|401|403|restricted|out of memory|cuda|driver|no space|killed" \
+    | tail -n 3 || true)"
+  [[ -n "$hint" ]] || hint="$(printf '%s\n' "$logs" | grep -v '^[[:space:]]*$' | tail -n 3 || true)"
+  printf '%s' "$hint" | tr '\n' ' ' | tr -s ' ' | cut -c1-600
 }
 
 cmd_prepare() {

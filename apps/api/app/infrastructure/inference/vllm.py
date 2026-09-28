@@ -79,7 +79,7 @@ def parse_outcome(result: ExecResult) -> RemoteOutcome:
             if value == "ok":
                 return RemoteOutcome(True, "ok", "")
             _, reason, message = [*value.split(":", 2), "", ""][:3]
-            return RemoteOutcome(False, reason or "unknown", message[:300])
+            return RemoteOutcome(False, reason or "unknown", message[:700])
     return RemoteOutcome(False, "transport", "no result line from remote command")
 
 

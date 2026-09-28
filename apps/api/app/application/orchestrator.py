@@ -157,7 +157,11 @@ class Orchestrator:
                 monitor.cancel()
                 await asyncio.gather(monitor, return_exceptions=True)
                 if run.error_code is not None:
-                    log.warning("job.failed", extra={"error_code": run.error_code.value})
+                    log.warning(
+                        "job.failed",
+                        # error messages are user-safe by contract (no document content/secrets)
+                        extra={"error_code": run.error_code.value, "error": run.error_message},
+                    )
                     await self._safe(
                         self.repo.record_event(
                             job.id,
