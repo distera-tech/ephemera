@@ -5,8 +5,11 @@
 **Context.** We need an open-source, GPU-efficient server with an OpenAI-compatible API
 and structured output, deployable by `docker run` on a fresh instance.
 
-**Decision.** `vllm/vllm-openai:v0.30.0-cu129` (entrypoint `vllm serve`, verified from the
-tagged Dockerfile) with `response_format: json_schema`, bound to `127.0.0.1` on the
+**Decision.** The official `vllm/vllm-openai` image (entrypoint `vllm serve`), chosen on
+the instance from the NVIDIA driver (`VLLM_IMAGE=auto`): `v0.30.0` (CUDA 13 main build) on
+driver ≥ 580, otherwise `v0.19.1`, the last release whose main build is CUDA 12.9. The
+`v0.30.0-cu129` variant was rejected after it crashed on real Brev (`operator
+torchvision::nms does not exist`). Used with `response_format: json_schema`, bound to `127.0.0.1` on the
 instance. Access is via SSH-executed `curl` against localhost — no port forwarding,
 no public port. `InferenceProvider` is the abstraction; `INFERENCE_ENGINE=nim` exists as
 a configuration value that currently fails fast with a clear error.

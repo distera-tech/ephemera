@@ -99,9 +99,13 @@ class VLLMProvider:
         inference_timeout_s: float = 240,
         min_free_disk_gb: int = 50,
         port: int = 8000,
+        image_cuda13: str = "vllm/vllm-openai:v0.30.0",
+        image_cuda12: str = "vllm/vllm-openai:v0.19.1",
     ) -> None:
         self.model_id = model_id
-        self.image = image
+        self.image = image  # "auto" = chosen on the instance from the NVIDIA driver version
+        self.image_cuda13 = image_cuda13
+        self.image_cuda12 = image_cuda12
         self.max_model_len = max_model_len
         self.gpu_memory_utilization = gpu_memory_utilization
         self._hf_token = hf_token
@@ -133,6 +137,8 @@ class VLLMProvider:
                 [
                     f"MODEL_ID={shlex.quote(self.model_id)}",
                     f"VLLM_IMAGE={shlex.quote(self.image)}",
+                    f"VLLM_IMAGE_CUDA13={shlex.quote(self.image_cuda13)}",
+                    f"VLLM_IMAGE_CUDA12={shlex.quote(self.image_cuda12)}",
                     f"MAX_MODEL_LEN={int(self.max_model_len)}",
                     f"GPU_MEMORY_UTILIZATION={float(self.gpu_memory_utilization)}",
                     f"SERVED_MODEL_NAME={SERVED_MODEL_NAME}",

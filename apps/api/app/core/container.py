@@ -51,6 +51,8 @@ def build_inference(settings: Settings) -> InferenceProvider:
     return VLLMProvider(
         model_id=settings.model_id,
         image=settings.vllm_image,
+        image_cuda13=settings.vllm_image_cuda13,
+        image_cuda12=settings.vllm_image_cuda12,
         max_model_len=settings.vllm_max_model_len,
         gpu_memory_utilization=settings.vllm_gpu_memory_utilization,
         hf_token=settings.hf_token.get_secret_value() if settings.hf_token else None,

@@ -14,7 +14,12 @@ from app.infrastructure.inference.runtime import bootstrap_script_path
 from app.infrastructure.inference.vllm import parse_gpu_line, parse_outcome
 
 STUBS = {
-    "nvidia-smi": 'echo "NVIDIA L40S, 46068, 550.54.15"',
+    "nvidia-smi": r"""
+case "$*" in
+  *--query-gpu=driver_version*) echo "${STUB_DRIVER:-550.54.15}" ;;
+  *) echo "NVIDIA L40S, 46068, ${STUB_DRIVER:-550.54.15}" ;;
+esac
+""",
     "docker": r"""
 echo "$@" >> "$STUB_LOG"
 case "$1" in
@@ -215,3 +220,23 @@ def test_prepare_reports_unreachable_docker_instead_of_hanging(env) -> None:  # 
     )
     outcome = parse_outcome(r)
     assert r.exit_code == 0 and not outcome.ok and outcome.reason == "no_docker"
+
+
+@pytest.mark.parametrize(
+    ("driver", "image"),
+    [("550.54.15", "vllm/vllm-openai:v0.19.1"), ("580.65.06", "vllm/vllm-openai:v0.30.0")],
+)
+def test_auto_image_follows_driver(env, driver: str, image: str) -> None:  # type: ignore[no-untyped-def]
+    """Real run 7: the v0.30.0-cu129 variant crashed (torchvision::nms). `auto` uses main builds:
+    CUDA 13 (v0.30.0) only when the driver supports it, else v0.19.1 (CUDA 12.9 main build)."""
+    job_dir, base, log = env
+    with (job_dir / "runtime.env").open("a") as fh:
+        fh.write(
+            "VLLM_IMAGE=auto\nVLLM_IMAGE_CUDA13=vllm/vllm-openai:v0.30.0\n"
+            "VLLM_IMAGE_CUDA12=vllm/vllm-openai:v0.19.1\n"
+        )
+    assert parse_outcome(run("start-model", job_dir, base, STUB_DRIVER=driver)).ok
+    assert wait_status(job_dir, "started") == "started"
+    assert (job_dir / "image").read_text().strip() == image
+    run_line = next(line for line in log.read_text().splitlines() if line.startswith("run "))
+    assert f" {image} org/model " in run_line

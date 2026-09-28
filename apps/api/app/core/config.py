@@ -78,9 +78,13 @@ class Settings(BaseSettings):
     model_id: str = "meta-llama/Llama-3.1-8B-Instruct"
     hf_token: SecretStr | None = None
     ngc_api_key: SecretStr | None = None
-    # CUDA 12.9 build: the default v0.30.0 tag is CUDA 13.0 and needs NVIDIA driver >= 580,
-    # which many cloud GPU images do not ship yet.
-    vllm_image: str = "vllm/vllm-openai:v0.30.0-cu129"
+    # "auto": chosen on the instance from the NVIDIA driver (nvidia-smi). Driver >= 580 gets
+    # the CUDA 13 main build of v0.30.0; older drivers get v0.19.1, the last release whose
+    # *main* build is CUDA 12.9. (The v0.30.0-cu129 variant crashed on real Brev with
+    # "operator torchvision::nms does not exist".) Any explicit image overrides this.
+    vllm_image: str = "auto"
+    vllm_image_cuda13: str = "vllm/vllm-openai:v0.30.0"
+    vllm_image_cuda12: str = "vllm/vllm-openai:v0.19.1"
     vllm_max_model_len: int = 16384
     vllm_gpu_memory_utilization: float = 0.90
     max_output_tokens: int = 1500

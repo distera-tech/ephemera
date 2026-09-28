@@ -44,6 +44,24 @@ load_runtime_env() {
     "${SERVED_MODEL_NAME:?}" "${PORT:?}"
 }
 
+# VLLM_IMAGE=auto: pick the image from the NVIDIA driver. CUDA 13 builds need driver >= 580.
+# The resolved image is recorded in $JOB_DIR/image so health messages name it.
+resolve_image() {
+  if [[ "$VLLM_IMAGE" == "auto" ]]; then
+    local driver major
+    driver="$(timeout 60 nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n1 || true)"
+    major="${driver%%.*}"
+    if [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 580 )); then
+      VLLM_IMAGE="${VLLM_IMAGE_CUDA13:?}"
+    else
+      VLLM_IMAGE="${VLLM_IMAGE_CUDA12:?}"
+    fi
+  fi
+  echo "$VLLM_IMAGE" > "$JOB_DIR/image"
+}
+
+resolved_image() { cat "$JOB_DIR/image" 2>/dev/null || echo "$VLLM_IMAGE"; }
+
 # Decide once (with bounded probes) whether docker needs sudo. A bare `docker info` can hang
 # while the instance is still being set up, so every probe has a timeout.
 DOCKER=()
@@ -127,6 +145,7 @@ cmd_start_bg() {
   local status="$JOB_DIR/start.status"
   trap 'echo "failed:unexpected:start failed at line $LINENO" > "$status"; rm -f "$JOB_DIR/secrets.env"; exit 0' ERR
   load_runtime_env
+  resolve_image
   detect_docker || { echo "failed:no_docker:docker daemon not reachable" > "$status"; exit 0; }
   if ! "${DOCKER[@]}" pull --quiet "$VLLM_IMAGE" > "$JOB_DIR/pull.log" 2>&1; then
     echo "failed:pull:failed to pull $VLLM_IMAGE ($(tail -c 160 "$JOB_DIR/pull.log" | tr '\n' ' '))" > "$status"
@@ -160,7 +179,7 @@ cmd_health() {
   local st running
   st="$(cat "$JOB_DIR/start.status" 2>/dev/null || echo missing)"
   case "$st" in
-    pulling) die not_ready "pulling image $VLLM_IMAGE" ;;
+    pulling) die not_ready "pulling image $(resolved_image)" ;;
     starting) die not_ready "starting model container" ;;
     failed:*) die start_failed "${st#failed:}" ;;
     missing) die start_failed "model start was never launched" ;;
@@ -168,7 +187,7 @@ cmd_health() {
   detect_docker || die not_ready "docker not reachable"
   running="$("${DOCKER[@]}" inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo missing)"
   if [[ "$running" != "true" ]]; then
-    die container_exited "model container stopped (exit code $("${DOCKER[@]}" inspect -f '{{.State.ExitCode}}' "$CONTAINER" 2>/dev/null || echo none)) $(container_hint)"
+    die container_exited "model container ($(resolved_image)) stopped (exit code $("${DOCKER[@]}" inspect -f '{{.State.ExitCode}}' "$CONTAINER" 2>/dev/null || echo none)) $(container_hint)"
   fi
   if curl -sf --max-time 5 "http://127.0.0.1:${PORT}/health" >/dev/null; then
     ok
